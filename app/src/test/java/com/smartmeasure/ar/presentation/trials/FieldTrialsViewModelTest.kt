@@ -1,0 +1,169 @@
+package com.smartmeasure.ar.presentation.trials
+
+import com.smartmeasure.ar.domain.model.CaptureCondition
+import com.smartmeasure.ar.domain.model.FieldTrial
+import com.smartmeasure.ar.domain.model.MeasurementKind
+import com.smartmeasure.ar.domain.repository.FieldTrialRepository
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import java.util.Locale
+
+/** In-memory fake: the real file repository has its own tests. */
+private class FakeFieldTrialRepository(
+    initial: List<FieldTrial> = emptyList(),
+    var failWrites: Boolean = false,
+) : FieldTrialRepository {
+    val trials = MutableStateFlow(initial)
+
+    override fun observeTrials(): Flow<List<FieldTrial>> = trials
+
+    override suspend fun add(trial: FieldTrial) {
+        if (failWrites) error("disk full")
+        trials.value = listOf(trial) + trials.value
+    }
+
+    override suspend fun delete(id: String) {
+        if (failWrites) error("disk full")
+        trials.value = trials.value.filterNot { it.id == id }
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class FieldTrialsViewModelTest : StringSpec({
+    lateinit var defaultLocale: Locale
+
+    beforeTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        defaultLocale = Locale.getDefault()
+        Locale.setDefault(Locale.US)
+    }
+    afterTest {
+        Dispatchers.resetMain()
+        Locale.setDefault(defaultLocale)
+    }
+
+    fun viewModel(repository: FieldTrialRepository) = FieldTrialsViewModel(
+        repository = repository,
+        deviceModel = "Acme One",
+        clock = { 42L },
+        idFactory = { "trial-1" },
+    )
+
+    "stored trials and their summaries reach the ui state" {
+        val stored = FieldTrial("a", 1L, "Acme One", false, MeasurementKind.WALL, 3.02, 3.0)
+        val vm = viewModel(FakeFieldTrialRepository(listOf(stored)))
+
+        vm.uiState.value.loading shouldBe false
+        vm.uiState.value.trials shouldBe listOf(stored)
+        vm.uiState.value.summaries.single().count shouldBe 1
+    }
+
+    "a captured AR distance prefills the draft and clears the reference" {
+        val vm = viewModel(FakeFieldTrialRepository())
+        vm.onReferenceChanged("9")
+
+        vm.startDraft(arMeters = 2.4567, depthEnabled = true)
+
+        vm.uiState.value.draft.arInput shouldBe "2.457"
+        vm.uiState.value.draft.referenceInput shouldBe ""
+        vm.uiState.value.draft.depthEnabled shouldBe true
+    }
+
+    "saving a valid draft stores it and keeps kind, depth and conditions" {
+        val repository = FakeFieldTrialRepository()
+        val vm = viewModel(repository)
+        vm.startDraft(arMeters = null, depthEnabled = true)
+        vm.onKindSelected(MeasurementKind.HEIGHT)
+        vm.onConditionToggled(CaptureCondition.LOW_LIGHT)
+        vm.onArChanged("2,61")
+        vm.onReferenceChanged("2.60")
+
+        vm.save()
+
+        repository.trials.value shouldBe listOf(
+            FieldTrial(
+                id = "trial-1",
+                recordedAtEpochMillis = 42L,
+                deviceModel = "Acme One",
+                depthEnabled = true,
+                kind = MeasurementKind.HEIGHT,
+                arMeters = 2.61,
+                referenceMeters = 2.60,
+                conditions = setOf(CaptureCondition.LOW_LIGHT),
+            ),
+        )
+        val state = vm.uiState.value
+        state.justSaved shouldBe true
+        state.draft shouldBe TrialDraft(
+            kind = MeasurementKind.HEIGHT,
+            depthEnabled = true,
+            conditions = setOf(CaptureCondition.LOW_LIGHT),
+        )
+    }
+
+    "an invalid draft is not stored and reports the field" {
+        val repository = FakeFieldTrialRepository()
+        val vm = viewModel(repository)
+        vm.onArChanged("3")
+        vm.onReferenceChanged("")
+
+        vm.save()
+
+        repository.trials.value shouldBe emptyList()
+        vm.uiState.value.inputError shouldBe TrialInputError.INVALID_REFERENCE
+    }
+
+    "editing the draft clears a previous error" {
+        val vm = viewModel(FakeFieldTrialRepository())
+        vm.save()
+        vm.uiState.value.inputError shouldBe TrialInputError.INVALID_AR
+
+        vm.onArChanged("1")
+
+        vm.uiState.value.inputError shouldBe null
+    }
+
+    "toggling a condition twice removes it" {
+        val vm = viewModel(FakeFieldTrialRepository())
+        vm.onConditionToggled(CaptureCondition.REFLECTIVE_SURFACE)
+        vm.onConditionToggled(CaptureCondition.REFLECTIVE_SURFACE)
+
+        vm.uiState.value.draft.conditions shouldBe emptySet()
+    }
+
+    "storage failures are surfaced instead of reported as saved" {
+        val vm = viewModel(FakeFieldTrialRepository(failWrites = true))
+        vm.onArChanged("1")
+        vm.onReferenceChanged("1")
+
+        vm.save()
+
+        vm.uiState.value.saveFailed shouldBe true
+        vm.uiState.value.justSaved shouldBe false
+    }
+
+    "delete removes the trial" {
+        val stored = FieldTrial("a", 1L, "Acme One", false, MeasurementKind.WALL, 3.02, 3.0)
+        val repository = FakeFieldTrialRepository(listOf(stored))
+        val vm = viewModel(repository)
+
+        vm.delete("a")
+
+        vm.uiState.value.trials shouldBe emptyList()
+    }
+
+    "export produces csv for the current trials" {
+        val stored = FieldTrial("a", 1L, "Acme One", false, MeasurementKind.WALL, 3.02, 3.0)
+        val vm = viewModel(FakeFieldTrialRepository(listOf(stored)))
+
+        vm.exportCsv() shouldContain "a,1970-01-01T00:00:00Z,Acme One,false,WALL,3.0200,3.0000"
+    }
+})

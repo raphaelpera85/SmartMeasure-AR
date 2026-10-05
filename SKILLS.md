@@ -1,0 +1,62 @@
+# SmartMeasure AR — mapa de skills
+
+Documento vivo. Atualize ao fim de cada sessão: skills usadas, skills que faltaram e skills criadas. Antes de qualquer tarefa, procure aqui a skill adequada; se a tarefa for recorrente e não houver skill, crie uma (Hermes: `skill_manage`; domínio do produto: `.agents/skills/`) e registre nesta página.
+
+## Skills do domínio (no repositório, `.agents/skills/`)
+
+| Skill | Quando usar |
+|---|---|
+| `medicao-residencial` | Levantamento de paredes, vãos, chanfros, perímetro e área; ensaios de precisão; confiança das medidas. |
+| `engenharia-plantas-residenciais` | Modelo de planta, editor 2D, cotas, separação medido/inferido/proposto, limites técnicos. |
+| `realidade-aumentada-residencial` | Captura ARCore, fallback, sinais de qualidade, Depth, validação em aparelho real. |
+| `design-interiores-residenciais` | Fase 3 (remodelação, mobiliário, acabamentos). |
+| `reconhecimento-moveis-itens` | Fase 4 (detecção/segmentação, dataset, catálogo). |
+| `FONTES.md` + `eval/*/ground-truth.md` | Fontes primárias e armadilhas de cada domínio. Releia antes de afirmar compatibilidade ou precisão. |
+
+## Especialistas
+
+O desenvolvimento é dividido entre os especialistas definidos em `.agents/especialistas/` (veja o `README.md` de lá). Cada brief lista as skills obrigatórias daquele especialista; a tabela abaixo mostra as mesmas skills organizadas por tipo de tarefa.
+
+## Skills do agente (Hermes) por tipo de tarefa
+
+| Tarefa | Skills obrigatórias | Complementares |
+|---|---|---|
+| Qualquer sessão neste projeto | `smartmeasure-ar-dev`, `smartmeasure-especialistas` (despacho para especialistas) | `fable-method` (rotina de trabalho) |
+| Funcionalidade nova ou correção de bug | `test-driven-development`, `smartmeasure-ar-dev` | `fable-loop` (tarefas com várias etapas), `lean-build` (risco de construir além do necessário), `surgical-patch` (correção pequena) |
+| Arquitetura, camadas, repositórios, use cases | `android-clean-architecture` | `safe-refactor` (reestruturação sem mudar comportamento) |
+| ViewModel, StateFlow, repositórios assíncronos e testes com coroutines | `kotlin-coroutines-flows` | — |
+| ARCore: sessão, Depth, hit tests, âncoras, renderização | `arcore-android` | `realidade-aumentada-residencial` |
+| Telas Compose / Material 3 | `mobile-android-design` | `impeccable` (crítica de UX, hierarquia, acessibilidade, textos de interface) |
+| Falha sem causa conhecida | `systematic-debugging` ou `investigate-first` | — |
+| Validar trabalho concluído | `fable-judge` (verificação adversarial), `verify-and-stop` | `requesting-code-review` |
+| Pesquisa de domínio ou nova skill de domínio | `fable-domain`, `grounded-citations` | `hermes-agent-skill-authoring` |
+| Economia de contexto e delegação | `caveman`, `cavecrew` | — |
+| Exportações futuras (PDF/planilha) | `pdf`, `xlsx` | — |
+
+Não se aplica: `kotlin-springboot`, porque o projeto não tem backend Spring.
+
+## Skills criadas para este projeto
+
+| Skill | Motivo |
+|---|---|
+| `smartmeasure-ar-dev` | Comandos de build, teste e lint; ciclo TDD com stubs `TODO()`; regras de arquitetura; armadilhas do ambiente Windows/git-bash. |
+| `arcore-android` | Não havia skill de ARCore. Registra ciclo de vida da sessão, Depth opcional, hit tests e a armadilha `getDisplay` (API 30) com `minSdk` 24. |
+| `kotlin-coroutines-flows` | Já era citada por `android-clean-architecture`, mas não existia. Cobre StateFlow, repositório com `Mutex` e testes com `Dispatchers.setMain`. |
+| `smartmeasure-especialistas` | Roteia toda tarefa ao especialista da área; inclui um modelo de contexto para `delegate_task`. |
+
+## Lacunas conhecidas (criar quando a tarefa surgir)
+
+- **Room/migrações**: quando o projeto/planta persistente substituir o arquivo de ensaios (Fase 1). Use também `migration`.
+- **Testes de UI Compose / instrumentados**: ainda não há `androidTest`. Crie a skill na primeira vez que forem configurados.
+- **Exportação de planta (PDF/imagem cotada)**: Fase 1.
+- **Protocolo de ensaio em campo**: a matriz de aparelhos e o roteiro de medição com trena laser podem virar skill de domínio em `.agents/skills/` depois da primeira rodada real.
+
+## Histórico de uso
+
+### 2026-10-05 — ensaios de precisão da Fase 0
+- **Usadas:** `fable-loop`, `android-clean-architecture`, `test-driven-development`; skills de domínio `medicao-residencial`, `engenharia-plantas-residenciais` e `realidade-aumentada-residencial` (lidas no início).
+- **Invocadas, mas não carregadas em detalhe nesta sessão:** `fable-method`, `fable-judge`, `fable-domain`, `mobile-android-design`, `impeccable`, `caveman`, `cavecrew`. 
+- **Criadas:** `smartmeasure-ar-dev`, `arcore-android`, `kotlin-coroutines-flows`.
+- **Especialistas criados:** Arquitetura Android, ARCore e Captura, Geometria e Medição, UI Compose e UX, Qualidade e Verificação, Pesquisa de Domínio e Skills.
+- **Primeiro ciclo com especialistas:** UI Compose e UX revisou a tela de ensaios (`mobile-android-design`, `impeccable`); Qualidade e Verificação conferiu (`fable-judge`, `verify-and-stop`) e deu o veredito VERIFICADO COM RESSALVAS. O gate passou: 34 testes e lint sem erros. As ressalvas foram encaminhadas a Geometria e Medição e a UI.
+- Geometria e Medição levou o critério de amostra representativa para o domínio (`TrialSummary.isRepresentative`, por TDD), e o orquestrador verificou com o gate: 38 testes, lint sem erros. O repositório git foi ligado a `github.com/raphaelpera85/SmartMeasure-AR`.
