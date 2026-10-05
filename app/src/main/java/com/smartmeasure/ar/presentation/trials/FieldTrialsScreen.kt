@@ -40,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -48,6 +49,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -58,13 +60,11 @@ import com.smartmeasure.ar.R
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.MeasurementKind
+import com.smartmeasure.ar.domain.model.TrialStatistics
 import com.smartmeasure.ar.domain.model.TrialSummary
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-
-/** Below this many samples the percentile is effectively the maximum and must be read as such. */
-private const val SMALL_SAMPLE = 10
 
 /** Tabular figures keep decimal points aligned when error values are scanned down a column. */
 private fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "tnum")
@@ -293,10 +293,12 @@ private fun TrialForm(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MeasurementKind.entries.forEach { kind ->
+                    // Exactly one kind applies: announce as a radio button, not FilterChip's checkbox.
                     FilterChip(
                         selected = draft.kind == kind,
                         onClick = { onKindSelected(kind) },
                         label = { Text(kindText(kind)) },
+                        modifier = Modifier.semantics { role = Role.RadioButton },
                     )
                 }
             }
@@ -382,7 +384,9 @@ private fun StatusMessage(text: String, isError: Boolean) {
 
 @Composable
 private fun SummaryCard(summary: TrialSummary) {
-    val cm = stringResource(R.string.trials_unit_cm)
+    val locale = currentLocale()
+    fun cm(valueMeters: Double): String =
+        TrialFormatting.centimeters(valueMeters, locale)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -401,7 +405,11 @@ private fun SummaryCard(summary: TrialSummary) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "${kindText(summary.kind)} · ${depthText(summary.depthEnabled)}",
+                    text = stringResource(
+                        R.string.trials_group_label,
+                        kindText(summary.kind),
+                        depthText(summary.depthEnabled),
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -414,26 +422,36 @@ private fun SummaryCard(summary: TrialSummary) {
 
             StatPair(
                 firstLabel = stringResource(R.string.trials_stat_mean),
-                firstValue = "${centimeters(summary.meanAbsoluteErrorMeters)} $cm",
+                firstValue = stringResource(R.string.trials_value_cm, cm(summary.meanAbsoluteErrorMeters)),
                 secondLabel = stringResource(R.string.trials_stat_median),
-                secondValue = "${centimeters(summary.medianAbsoluteErrorMeters)} $cm",
+                secondValue = stringResource(R.string.trials_value_cm, cm(summary.medianAbsoluteErrorMeters)),
             )
             StatPair(
                 firstLabel = stringResource(R.string.trials_stat_p90),
-                firstValue = "${centimeters(summary.p90AbsoluteErrorMeters)} $cm",
+                firstValue = stringResource(R.string.trials_value_cm, cm(summary.p90AbsoluteErrorMeters)),
                 secondLabel = stringResource(R.string.trials_stat_max),
-                secondValue = "${centimeters(summary.maxAbsoluteErrorMeters)} $cm",
+                secondValue = stringResource(R.string.trials_value_cm, cm(summary.maxAbsoluteErrorMeters)),
             )
             StatPair(
                 firstLabel = stringResource(R.string.trials_stat_bias),
-                firstValue = "${signedCentimeters(summary.meanSignedErrorMeters)} $cm",
+                firstValue = stringResource(
+                    R.string.trials_value_cm,
+                    TrialFormatting.signedCentimeters(summary.meanSignedErrorMeters, locale),
+                ),
                 secondLabel = stringResource(R.string.trials_stat_relative),
-                secondValue = "${percent(summary.meanRelativeError)} %",
+                secondValue = stringResource(
+                    R.string.trials_value_percent,
+                    TrialFormatting.percent(summary.meanRelativeError, locale),
+                ),
             )
 
-            if (summary.count < SMALL_SAMPLE) {
+            if (!summary.isRepresentative) {
                 Text(
-                    text = pluralStringResource(R.plurals.trials_small_sample, SMALL_SAMPLE, SMALL_SAMPLE),
+                    text = pluralStringResource(
+                        R.plurals.trials_small_sample,
+                        TrialStatistics.MIN_REPRESENTATIVE_SAMPLES,
+                        TrialStatistics.MIN_REPRESENTATIVE_SAMPLES,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -475,12 +493,26 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
 
 @Composable
 private fun TrialRow(trial: FieldTrial, onDelete: () -> Unit) {
+    val locale = currentLocale()
     val recordedAt = recordedAtText(trial.recordedAtEpochMillis)
     val kind = kindText(trial.kind)
+    val arText = TrialFormatting.meters(trial.arMeters, locale)
+    val referenceText = TrialFormatting.meters(trial.referenceMeters, locale)
     val conditions = trial.conditions
         .sortedBy { it.ordinal }
         .map { conditionText(it) }
-    val deleteDescription = stringResource(R.string.trials_delete_a11y, kind, recordedAt)
+    val details = if (conditions.isEmpty()) {
+        recordedAt
+    } else {
+        stringResource(
+            R.string.trials_row_details,
+            recordedAt,
+            conditions.joinToString(stringResource(R.string.trials_conditions_separator)),
+        )
+    }
+    // AR and reference values tell apart two trials of the same kind saved in the same minute.
+    val deleteDescription =
+        stringResource(R.string.trials_delete_a11y, kind, recordedAt, arText, referenceText)
 
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -494,29 +526,25 @@ private fun TrialRow(trial: FieldTrial, onDelete: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "$kind · ${depthText(trial.depthEnabled)}",
+                    text = stringResource(R.string.trials_group_label, kind, depthText(trial.depthEnabled)),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = stringResource(
                         R.string.trials_row_error,
-                        signedCentimeters(trial.signedErrorMeters),
-                        percent(trial.relativeError),
+                        TrialFormatting.signedCentimeters(trial.signedErrorMeters, locale),
+                        TrialFormatting.percent(trial.relativeError, locale),
                     ),
                     style = MaterialTheme.typography.titleMedium.tabular(),
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = stringResource(
-                        R.string.trials_row_values,
-                        meters(trial.arMeters),
-                        meters(trial.referenceMeters),
-                    ),
+                    text = stringResource(R.string.trials_row_values, arText, referenceText),
                     style = MaterialTheme.typography.bodyMedium.tabular(),
                 )
                 Text(
-                    text = (listOf(recordedAt) + conditions).joinToString(" · "),
+                    text = details,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -540,24 +568,26 @@ private fun DeleteTrialDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val locale = currentLocale()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.trials_delete_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = listOf(
+                    text = stringResource(
+                        R.string.trials_delete_summary,
                         kindText(trial.kind),
                         depthText(trial.depthEnabled),
                         recordedAtText(trial.recordedAtEpochMillis),
-                    ).joinToString(" · "),
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
                     text = stringResource(
                         R.string.trials_row_values,
-                        meters(trial.arMeters),
-                        meters(trial.referenceMeters),
+                        TrialFormatting.meters(trial.arMeters, locale),
+                        TrialFormatting.meters(trial.referenceMeters, locale),
                     ),
                     style = MaterialTheme.typography.bodyMedium.tabular(),
                 )
@@ -582,10 +612,17 @@ private fun DeleteTrialDialog(
     )
 }
 
+/** Locale of the current configuration, so a language change recomposes formatted text. */
 @Composable
-private fun recordedAtText(epochMillis: Long): String = remember(epochMillis) {
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault())
-        .format(Date(epochMillis))
+private fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
+
+@Composable
+private fun recordedAtText(epochMillis: Long): String {
+    val locale = currentLocale()
+    return remember(epochMillis, locale) {
+        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale)
+            .format(Date(epochMillis))
+    }
 }
 
 @Composable
@@ -613,15 +650,3 @@ private fun conditionText(condition: CaptureCondition): String = stringResource(
 private fun depthText(depthEnabled: Boolean): String = stringResource(
     if (depthEnabled) R.string.trials_with_depth else R.string.trials_without_depth,
 )
-
-private fun meters(value: Double): String =
-    String.format(Locale.getDefault(), "%.3f", value)
-
-private fun centimeters(valueMeters: Double): String =
-    String.format(Locale.getDefault(), "%.1f", valueMeters * 100)
-
-private fun signedCentimeters(valueMeters: Double): String =
-    String.format(Locale.getDefault(), "%+.1f", valueMeters * 100)
-
-private fun percent(fraction: Double): String =
-    String.format(Locale.getDefault(), "%.1f", fraction * 100)
