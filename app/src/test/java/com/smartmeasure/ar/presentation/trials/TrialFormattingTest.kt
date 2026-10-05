@@ -45,4 +45,21 @@ class TrialFormattingTest : StringSpec({
         TrialFormatting.meters(2.5, ptBr) shouldBe "2,500"
         TrialFormatting.meters(2.5, en) shouldBe "2.500"
     }
+
+    "path meters keeps one decimal, rounding half away from zero" {
+        TrialFormatting.pathMeters(4.25, ptBr) shouldBe "4,3"
+        TrialFormatting.pathMeters(4.24, en) shouldBe "4.2"
+        TrialFormatting.pathMeters(0.0, ptBr) shouldBe "0,0"
+    }
+
+    "whole percent converts a 0..1 share to an integer percentage" {
+        TrialFormatting.wholePercent(0.92, ptBr) shouldBe "92"
+        TrialFormatting.wholePercent(0.0, en) shouldBe "0"
+        TrialFormatting.wholePercent(1.0, en) shouldBe "100"
+    }
+
+    "whole percent rounds down so 100 only appears when tracking never dropped" {
+        TrialFormatting.wholePercent(0.996, ptBr) shouldBe "99"
+        TrialFormatting.wholePercent(0.929, en) shouldBe "92"
+    }
 })

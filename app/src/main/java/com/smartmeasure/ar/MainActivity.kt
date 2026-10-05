@@ -166,6 +166,7 @@ class MainActivity : ComponentActivity() {
                             onDelete = fieldTrialsViewModel::delete,
                             onExport = ::shareFieldTrialsCsv,
                             onBack = { destination = fieldTrialsReturnDestination },
+                            onRecoverStorage = fieldTrialsViewModel::recoverStorage,
                         )
                     }
                 }

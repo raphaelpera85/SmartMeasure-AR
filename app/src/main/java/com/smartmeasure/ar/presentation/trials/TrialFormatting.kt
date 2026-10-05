@@ -16,6 +16,7 @@ object TrialFormatting {
     private const val CM_DECIMALS = 1
     private const val PERCENT_DECIMALS = 1
     private const val M_DECIMALS = 3
+    private const val PATH_M_DECIMALS = 1
 
     fun meters(valueMeters: Double, locale: Locale): String =
         format(round(BigDecimal.valueOf(valueMeters), M_DECIMALS), locale, signed = false)
@@ -28,6 +29,19 @@ object TrialFormatting {
 
     fun percent(fraction: Double, locale: Locale): String =
         format(round(BigDecimal.valueOf(fraction).movePointRight(2), PERCENT_DECIMALS), locale, signed = false)
+
+    /** Camera path length: one decimal is enough for a walked distance ("4.2"). */
+    fun pathMeters(valueMeters: Double, locale: Locale): String =
+        format(round(BigDecimal.valueOf(valueMeters), PATH_M_DECIMALS), locale, signed = false)
+
+    /**
+     * A 0..1 share as a whole percentage, rounded down: "100" only when the share is exactly 1,
+     * so a session that lost tracking briefly never reads as fully tracked.
+     */
+    fun wholePercent(fraction: Double, locale: Locale): String {
+        val percent = BigDecimal.valueOf(fraction).movePointRight(2).setScale(0, RoundingMode.DOWN)
+        return format(percent, locale, signed = false)
+    }
 
     private fun round(value: BigDecimal, decimals: Int): BigDecimal {
         val rounded = value.setScale(decimals, RoundingMode.HALF_UP)

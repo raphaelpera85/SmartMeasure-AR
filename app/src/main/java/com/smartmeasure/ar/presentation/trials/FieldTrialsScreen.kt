@@ -45,18 +45,22 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.smartmeasure.ar.R
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.MeasurementKind
@@ -81,10 +85,12 @@ fun FieldTrialsScreen(
     onDelete: (String) -> Unit,
     onExport: () -> Unit,
     onBack: () -> Unit,
+    onRecoverStorage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
+    var confirmRecovery by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
         LazyColumn(
@@ -105,6 +111,16 @@ fun FieldTrialsScreen(
                     Text(
                         text = stringResource(R.string.trials_subtitle),
                         style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+
+            // Above the form: it explains why saving is disabled before the user tries.
+            if (uiState.storageUnreadable) {
+                item {
+                    StorageUnreadableCard(
+                        recoveryFailed = uiState.recoveryFailed,
+                        onRecover = { confirmRecovery = true },
                     )
                 }
             }
@@ -186,6 +202,91 @@ fun FieldTrialsScreen(
             onDismiss = { pendingDelete = null },
         )
     }
+
+    // Hidden once the file is readable again (recovery succeeded elsewhere or storage changed).
+    if (confirmRecovery && uiState.storageUnreadable) {
+        RecoverStorageDialog(
+            onConfirm = {
+                confirmRecovery = false
+                onRecoverStorage()
+            },
+            onDismiss = { confirmRecovery = false },
+        )
+    }
+}
+
+/**
+ * Storage could not be read: says what happened, that nothing is saved meanwhile, and offers the
+ * one way out. The failure line appears inside the same card, next to the button that retries.
+ */
+@Composable
+private fun StorageUnreadableCard(recoveryFailed: Boolean, onRecover: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.trials_storage_unreadable_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = stringResource(R.string.trials_storage_unreadable_message),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+            )
+            if (recoveryFailed) {
+                Text(
+                    text = stringResource(R.string.trials_storage_recover_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+                )
+            }
+            Button(
+                onClick = onRecover,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.trials_storage_recover))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecoverStorageDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.trials_storage_recover_title)) },
+        text = { Text(stringResource(R.string.trials_storage_recover_message)) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
+                Text(stringResource(R.string.trials_storage_recover_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -353,8 +454,19 @@ private fun TrialForm(
                 )
             }
 
-            Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onSave,
+                enabled = !uiState.storageUnreadable,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(stringResource(R.string.trials_save))
+            }
+            if (uiState.storageUnreadable) {
+                Text(
+                    text = stringResource(R.string.trials_save_blocked),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -548,6 +660,7 @@ private fun TrialRow(trial: FieldTrial, onDelete: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                trial.session?.let { SessionSummaryLine(it) }
             }
             TextButton(
                 onClick = onDelete,
@@ -560,6 +673,51 @@ private fun TrialRow(trial: FieldTrial, onDelete: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Secondary line with the AR session the trial came from. The visible text abbreviates planes
+ * (H / V); screen readers get the spelled-out version.
+ */
+@Composable
+private fun SessionSummaryLine(session: ArSessionSummary) {
+    val locale = currentLocale()
+    val distance = TrialFormatting.pathMeters(session.distanceMeters, locale)
+    val losses = pluralStringResource(
+        R.plurals.ar_session_losses,
+        session.trackingLosses,
+        session.trackingLosses,
+    )
+    val ratio = session.trackingRatio?.let { TrialFormatting.wholePercent(it, locale) }
+    val text: String
+    val description: String
+    if (ratio != null) {
+        text = stringResource(
+            R.string.trials_row_session,
+            distance, losses, ratio, session.horizontalPlanes, session.verticalPlanes,
+        )
+        description = stringResource(
+            R.string.trials_row_session_a11y,
+            distance, losses, ratio, session.horizontalPlanes, session.verticalPlanes,
+        )
+    } else {
+        text = stringResource(
+            R.string.trials_row_session_no_ratio,
+            distance, losses, session.horizontalPlanes, session.verticalPlanes,
+        )
+        description = stringResource(
+            R.string.trials_row_session_no_ratio_a11y,
+            distance, losses, session.horizontalPlanes, session.verticalPlanes,
+        )
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall.tabular(),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Replaces the semantic text (not contentDescription): the row merges its children, and a
+        // description there would make TalkBack read it instead of the whole row.
+        modifier = Modifier.clearAndSetSemantics { this.text = AnnotatedString(description) },
+    )
 }
 
 @Composable
