@@ -121,6 +121,6 @@ Fontes primárias e limitações estão em [.agents/skills/FONTES.md](.agents/sk
 ## Próxima etapa
 
 1. Instalar o APK de debug em aparelhos reais e fazer a primeira rodada de ensaios: paredes, vãos e alturas, com e sem Depth, nas condições listadas. Exportar o CSV de cada aparelho.
-2. Ajustes finos de texto na tela de ensaios: espaço antes de "%" igual em todos os textos em inglês e espaço não separável entre número e unidade.
-3. Registrar percurso e cobertura durante a captura AR.
+2. Registrar percurso e cobertura durante a captura AR (com o especialista de ARCore).
+3. Usar espaço não separável também nos resultados da medição manual e da tela AR (`area_result`, `perimeter_result`, `ar_distance_result`).
 4. Com os dados reais, definir requisitos mínimos de aparelho, política de fallback e limites de aceitação.

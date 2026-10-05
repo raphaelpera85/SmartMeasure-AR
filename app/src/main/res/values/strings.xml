@@ -74,8 +74,8 @@
     <string name="trials_conditions_label">Capture conditions</string>
     <string name="trials_save">Save trial</string>
     <string name="trials_saved">Trial saved. Kind, Depth and conditions were kept for the next one.</string>
-    <string name="trials_error_ar">Enter an AR value greater than 0 and up to 100 m.</string>
-    <string name="trials_error_reference">Enter a reference value greater than 0 and up to 100 m.</string>
+    <string name="trials_error_ar">Enter an AR value greater than 0 and up to 100\u00A0m.</string>
+    <string name="trials_error_reference">Enter a reference value greater than 0 and up to 100\u00A0m.</string>
     <string name="trials_error_storage">The trial list could not be updated on this device. Try again; if it keeps failing, export the CSV so the data is not lost.</string>
     <string name="trials_summary_title">Error by measurement type</string>
     <string name="trials_loading">Loading trials…</string>
@@ -83,8 +83,8 @@
     <string name="trials_export">Export CSV</string>
     <string name="trials_export_chooser">Export accuracy trials</string>
     <string name="trials_list_title">Recorded trials (%1$d)</string>
-    <string name="trials_row_values">AR %1$s m · reference %2$s m</string>
-    <string name="trials_row_error">AR − reference: %1$s cm (%2$s %%)</string>
+    <string name="trials_row_values">AR %1$s\u00A0m · reference %2$s\u00A0m</string>
+    <string name="trials_row_error">AR − reference: %1$s\u00A0cm (%2$s%%)</string>
     <string name="trials_delete">Delete</string>
     <string name="trials_delete_title">Delete this trial?</string>
     <string name="trials_delete_message">The comparison will be removed from this device. Exported files are not affected.</string>
@@ -92,7 +92,7 @@
     <string name="trials_with_depth">with Depth</string>
     <string name="trials_without_depth">without Depth</string>
     <string name="trials_note">These numbers describe this device under the recorded conditions only. They are not a certified accuracy and must not be generalized to other phones.</string>
-    <string name="trials_value_cm">%1$s cm</string>
+    <string name="trials_value_cm">%1$s\u00A0cm</string>
     <string name="trials_value_percent">%1$s%%</string>
     <string name="trials_group_label">%1$s · %2$s</string>
     <string name="trials_row_details">%1$s · %2$s</string>

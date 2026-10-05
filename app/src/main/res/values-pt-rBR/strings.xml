@@ -74,8 +74,8 @@
     <string name="trials_conditions_label">Condições da captura</string>
     <string name="trials_save">Salvar ensaio</string>
     <string name="trials_saved">Ensaio salvo. Tipo, profundidade e condições foram mantidos para o próximo.</string>
-    <string name="trials_error_ar">Informe uma medida AR maior que 0 e de até 100 m.</string>
-    <string name="trials_error_reference">Informe uma referência maior que 0 e de até 100 m.</string>
+    <string name="trials_error_ar">Informe uma medida AR maior que 0 e de até 100\u00A0m.</string>
+    <string name="trials_error_reference">Informe uma referência maior que 0 e de até 100\u00A0m.</string>
     <string name="trials_error_storage">Não foi possível atualizar a lista de ensaios neste aparelho. Tente de novo; se continuar, exporte o CSV para não perder os dados.</string>
     <string name="trials_summary_title">Erro por tipo de medida</string>
     <string name="trials_loading">Carregando ensaios…</string>
@@ -83,8 +83,8 @@
     <string name="trials_export">Exportar CSV</string>
     <string name="trials_export_chooser">Exportar ensaios de precisão</string>
     <string name="trials_list_title">Ensaios registrados (%1$d)</string>
-    <string name="trials_row_values">AR %1$s m · referência %2$s m</string>
-    <string name="trials_row_error">AR − referência: %1$s cm (%2$s %%)</string>
+    <string name="trials_row_values">AR %1$s\u00A0m · referência %2$s\u00A0m</string>
+    <string name="trials_row_error">AR − referência: %1$s\u00A0cm (%2$s\u00A0%%)</string>
     <string name="trials_delete">Excluir</string>
     <string name="trials_delete_title">Excluir este ensaio?</string>
     <string name="trials_delete_message">A comparação será removida deste aparelho. Arquivos já exportados não são afetados.</string>
@@ -92,8 +92,8 @@
     <string name="trials_with_depth">com profundidade</string>
     <string name="trials_without_depth">sem profundidade</string>
     <string name="trials_note">Estes números descrevem apenas este aparelho nas condições registradas. Não são precisão certificada e não devem ser generalizados para outros celulares.</string>
-    <string name="trials_value_cm">%1$s cm</string>
-    <string name="trials_value_percent">%1$s %%</string>
+    <string name="trials_value_cm">%1$s\u00A0cm</string>
+    <string name="trials_value_percent">%1$s\u00A0%%</string>
     <string name="trials_group_label">%1$s · %2$s</string>
     <string name="trials_row_details">%1$s · %2$s</string>
     <string name="trials_conditions_separator">", "</string>
