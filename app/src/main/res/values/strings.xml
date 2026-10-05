@@ -59,6 +59,8 @@
     <string name="ar_msg_ready">Measurement captured. Reset or capture again to start a new measurement.</string>
     <string name="ar_msg_no_surface">No reliable surface at the crosshair. Move the phone and try again.</string>
     <string name="ar_msg_error">The AR session stopped. Return and use manual mode if the problem continues.</string>
+    <string name="ar_session_path">Path %1$s\u00A0m · tracking %2$s\u00A0s of %3$s\u00A0s</string>
+    <string name="ar_session_quality">%1$s · planes: horizontal %2$d, vertical %3$d</string>
     <string name="cancel">Cancel</string>
     <string name="open_field_trials">Accuracy trials</string>
     <string name="record_trial">Compare with reference</string>
@@ -121,5 +123,9 @@
     <plurals name="trials_count">
         <item quantity="one">%1$d trial</item>
         <item quantity="other">%1$d trials</item>
+    </plurals>
+    <plurals name="ar_session_losses">
+        <item quantity="one">%1$d tracking loss</item>
+        <item quantity="other">%1$d tracking losses</item>
     </plurals>
 </resources>

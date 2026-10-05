@@ -1,0 +1,117 @@
+package com.smartmeasure.ar.domain.model
+
+import kotlin.math.sqrt
+
+/**
+ * Path and tracking quality of one AR measurement session, used to compare devices and
+ * capture conditions. Values are observations of the session, not an accuracy figure.
+ *
+ * @property distanceMeters camera path length while tracking (see [ArSessionPathRecorder]).
+ * @property trackingLosses transitions from tracking to not tracking after the first fix.
+ * @property durationSeconds session time with frames, excluding gaps over the limit.
+ * @property trackingSeconds part of [durationSeconds] spent tracking.
+ * @property horizontalPlanes tracked horizontal planes (floor, tables, ceiling).
+ * @property verticalPlanes tracked vertical planes (walls).
+ */
+data class ArSessionSummary(
+    val distanceMeters: Double,
+    val trackingLosses: Int,
+    val durationSeconds: Double,
+    val trackingSeconds: Double,
+    val horizontalPlanes: Int,
+    val verticalPlanes: Int,
+)
+
+/**
+ * Records the camera path of one AR session from per-frame samples.
+ *
+ * Distance uses a reference point: a new position only adds distance once it is at least
+ * [MIN_STEP_METERS] away from the last counted position, which then moves to it. Pose jitter
+ * smaller than that never accumulates, independent of the frame rate. Slow, curved paths are
+ * approximated by chords of at least [MIN_STEP_METERS], so the total is a slight underestimate.
+ *
+ * When tracking is lost the reference point is dropped, so the jump between the last pose before
+ * the loss and the first pose after relocalization is not summed.
+ *
+ * Time: each interval between consecutive samples takes the tracking state of the sample that
+ * starts it. Intervals longer than [MAX_SAMPLE_GAP_NANOS] (session paused, app in background)
+ * count neither as time nor as distance. Non-increasing timestamps add no time.
+ *
+ * Takes primitives so the GL thread does not allocate a sample object per frame.
+ * Not thread-safe: feed and read it from a single thread (the GL thread).
+ */
+class ArSessionPathRecorder {
+    private var hasReference = false
+    private var refX = 0f
+    private var refY = 0f
+    private var refZ = 0f
+    private var distanceMeters = 0.0
+    private var trackingLosses = 0
+    private var lastTracking = false
+    private var hasSample = false
+    private var lastTimestampNanos = 0L
+    private var durationNanos = 0L
+    private var trackingNanos = 0L
+
+    fun addSample(timestampNanos: Long, tracking: Boolean, x: Float, y: Float, z: Float) {
+        if (hasSample) {
+            val dt = timestampNanos - lastTimestampNanos
+            if (dt > MAX_SAMPLE_GAP_NANOS) {
+                hasReference = false
+            } else if (dt > 0) {
+                durationNanos += dt
+                if (lastTracking) trackingNanos += dt
+            }
+        }
+        if (!hasSample || timestampNanos > lastTimestampNanos) lastTimestampNanos = timestampNanos
+        hasSample = true
+
+        if (!tracking) {
+            if (lastTracking) trackingLosses++
+            lastTracking = false
+            hasReference = false
+            return
+        }
+        lastTracking = true
+        if (!hasReference) {
+            setReference(x, y, z)
+            return
+        }
+        val dx = (x - refX).toDouble()
+        val dy = (y - refY).toDouble()
+        val dz = (z - refZ).toDouble()
+        val step = sqrt(dx * dx + dy * dy + dz * dz)
+        if (step >= MIN_STEP_METERS) {
+            distanceMeters += step
+            setReference(x, y, z)
+        }
+    }
+
+    /** Plane counts come from the caller (ARCore trackables), not from the samples. */
+    fun summary(horizontalPlanes: Int = 0, verticalPlanes: Int = 0): ArSessionSummary =
+        ArSessionSummary(
+            distanceMeters = distanceMeters,
+            trackingLosses = trackingLosses,
+            durationSeconds = durationNanos / NANOS_PER_SECOND,
+            trackingSeconds = trackingNanos / NANOS_PER_SECOND,
+            horizontalPlanes = horizontalPlanes,
+            verticalPlanes = verticalPlanes,
+        )
+
+    private fun setReference(x: Float, y: Float, z: Float) {
+        refX = x
+        refY = y
+        refZ = z
+        hasReference = true
+    }
+
+    companion object {
+        /** Minimum displacement (2 cm) counted as movement; smaller pose changes are jitter. */
+        const val MIN_STEP_METERS = 0.02
+
+        /** Longest interval between samples (1 s) still counted; longer means a paused session. */
+        const val MAX_SAMPLE_GAP_NANOS = 1_000_000_000L
+
+        private const val NANOS_PER_SECOND = 1_000_000_000.0
+    }
+}

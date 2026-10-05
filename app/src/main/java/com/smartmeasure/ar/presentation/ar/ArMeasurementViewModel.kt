@@ -1,6 +1,7 @@
 package com.smartmeasure.ar.presentation.ar
 
 import androidx.lifecycle.ViewModel
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,6 +16,7 @@ class ArMeasurementViewModel : ViewModel() {
             it.copy(
                 sessionReady = true,
                 depthEnabled = depthEnabled,
+                sessionSummary = null,
                 message = ArMeasurementMessage.MOVE_PHONE,
             )
         }
@@ -46,6 +48,10 @@ class ArMeasurementViewModel : ViewModel() {
                 },
             )
         }
+    }
+
+    fun onSessionSummary(summary: ArSessionSummary) {
+        _uiState.update { it.copy(sessionSummary = summary) }
     }
 
     fun onNoSurface() {

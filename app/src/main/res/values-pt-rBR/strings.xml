@@ -59,6 +59,8 @@
     <string name="ar_msg_ready">Medição capturada. Reinicie ou capture novamente para começar outra medição.</string>
     <string name="ar_msg_no_surface">Nenhuma superfície confiável na mira. Mova o celular e tente novamente.</string>
     <string name="ar_msg_error">A sessão AR parou. Volte e use o modo manual se o problema continuar.</string>
+    <string name="ar_session_path">Percurso %1$s\u00A0m · rastreando %2$s\u00A0s de %3$s\u00A0s</string>
+    <string name="ar_session_quality">%1$s · planos: horizontais %2$d, verticais %3$d</string>
     <string name="cancel">Cancelar</string>
     <string name="open_field_trials">Ensaios de precisão</string>
     <string name="record_trial">Comparar com referência</string>
@@ -123,5 +125,10 @@
         <item quantity="one">%1$d ensaio</item>
         <item quantity="many">%1$d ensaios</item>
         <item quantity="other">%1$d ensaios</item>
+    </plurals>
+    <plurals name="ar_session_losses">
+        <item quantity="one">%1$d perda de rastreamento</item>
+        <item quantity="many">%1$d perdas de rastreamento</item>
+        <item quantity="other">%1$d perdas de rastreamento</item>
     </plurals>
 </resources>

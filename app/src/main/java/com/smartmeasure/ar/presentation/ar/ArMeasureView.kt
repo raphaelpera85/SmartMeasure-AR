@@ -14,6 +14,8 @@ import com.google.ar.core.Plane
 import com.google.ar.core.Point
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.smartmeasure.ar.domain.model.ArSessionPathRecorder
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -32,11 +34,19 @@ class ArMeasureView(
         fun onPointCaptured(pointCount: Int, distanceMeters: Double?)
         fun onNoSurface()
         fun onSessionError()
+
+        /** Path and tracking quality so far; called at most every [SUMMARY_INTERVAL_NANOS]. */
+        fun onSessionSummary(summary: ArSessionSummary)
     }
 
     private val renderer = ArRenderer()
     private var session: Session? = null
     private var sessionResumed = false
+
+    private companion object {
+        /** Session summary publish interval (500 ms, at most 2 Hz) to limit UI recompositions. */
+        const val SUMMARY_INTERVAL_NANOS = 500_000_000L
+    }
 
     init {
         setEGLContextClientVersion(2)
@@ -98,6 +108,8 @@ class ArMeasureView(
         private var firstAnchor: Anchor? = null
         private var secondAnchor: Anchor? = null
         private var lastTracking: Boolean? = null
+        private val pathRecorder = ArSessionPathRecorder()
+        private var lastSummaryNanos = 0L
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             GLES20.glClearColor(0f, 0f, 0f, 1f)
@@ -133,12 +145,47 @@ class ArMeasureView(
                     post { listener.onTrackingChanged(tracking) }
                 }
 
+                recordPath(activeSession, frame, tracking)
+
                 if (captureRequested.getAndSet(false)) {
                     captureCenter(frame, tracking)
                 }
             } catch (_: Exception) {
                 post { listener.onSessionError() }
             }
+        }
+
+        private fun recordPath(session: Session, frame: Frame, tracking: Boolean) {
+            val timestamp = frame.timestamp
+            // ARCore may return a frame with timestamp 0 before the camera delivers images.
+            if (timestamp == 0L) return
+
+            if (tracking) {
+                // Camera#getPose is the physical camera; its translation equals displayOrientedPose's.
+                val pose = frame.camera.pose
+                pathRecorder.addSample(timestamp, true, pose.tx(), pose.ty(), pose.tz())
+            } else {
+                pathRecorder.addSample(timestamp, false, 0f, 0f, 0f)
+            }
+
+            if (timestamp - lastSummaryNanos < SUMMARY_INTERVAL_NANOS) return
+            lastSummaryNanos = timestamp
+
+            var horizontal = 0
+            var vertical = 0
+            for (plane in session.getAllTrackables(Plane::class.java)) {
+                // Merged planes stay listed with subsumedBy set; count only the surviving plane.
+                if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) continue
+                when (plane.type) {
+                    Plane.Type.HORIZONTAL_UPWARD_FACING,
+                    Plane.Type.HORIZONTAL_DOWNWARD_FACING,
+                    -> horizontal++
+                    Plane.Type.VERTICAL -> vertical++
+                    null -> Unit
+                }
+            }
+            val summary = pathRecorder.summary(horizontal, vertical)
+            post { listener.onSessionSummary(summary) }
         }
 
         private fun captureCenter(frame: Frame, tracking: Boolean) {

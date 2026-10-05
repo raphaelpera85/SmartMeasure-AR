@@ -19,6 +19,7 @@ import com.smartmeasure.ar.data.ar.ArCoreAvailabilityRepository
 import com.smartmeasure.ar.data.ar.ArSessionInspector
 import com.smartmeasure.ar.data.trial.FileFieldTrialRepository
 import com.smartmeasure.ar.domain.model.ArPreparationResult
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.DepthSupport
 import com.smartmeasure.ar.presentation.ar.ArMeasureView
 import com.smartmeasure.ar.presentation.ar.ArMeasurementScreen
@@ -128,6 +129,10 @@ class MainActivity : ComponentActivity() {
 
                                 override fun onSessionError() {
                                     arMeasurementViewModel.onSessionError()
+                                }
+
+                                override fun onSessionSummary(summary: ArSessionSummary) {
+                                    arMeasurementViewModel.onSessionSummary(summary)
                                 }
                             },
                             onResetState = arMeasurementViewModel::onReset,

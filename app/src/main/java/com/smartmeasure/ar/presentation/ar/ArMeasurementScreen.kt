@@ -21,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.smartmeasure.ar.R
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import java.util.Locale
 
 @Composable
@@ -104,6 +107,9 @@ fun ArMeasurementScreen(
                     },
                     style = MaterialTheme.typography.bodySmall,
                 )
+                uiState.sessionSummary?.let { summary ->
+                    SessionSummaryText(summary)
+                }
                 uiState.distanceMeters?.let { distance ->
                     Text(
                         text = stringResource(
@@ -182,6 +188,34 @@ private fun messageText(message: ArMeasurementMessage): String = stringResource(
         ArMeasurementMessage.SESSION_ERROR -> R.string.ar_msg_error
     },
 )
+
+@Composable
+private fun SessionSummaryText(summary: ArSessionSummary) {
+    // Configuration locale (API 24) so a language change recomposes, as in FieldTrialsScreen.
+    val locale = LocalConfiguration.current.locales[0]
+    Text(
+        text = stringResource(
+            R.string.ar_session_path,
+            String.format(locale, "%.2f", summary.distanceMeters),
+            String.format(locale, "%.0f", summary.trackingSeconds),
+            String.format(locale, "%.0f", summary.durationSeconds),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Text(
+        text = stringResource(
+            R.string.ar_session_quality,
+            pluralStringResource(
+                R.plurals.ar_session_losses,
+                summary.trackingLosses,
+                summary.trackingLosses,
+            ),
+            summary.horizontalPlanes,
+            summary.verticalPlanes,
+        ),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
 
 private fun formatMeters(value: Double): String =
     String.format(Locale.getDefault(), "%.3f", value)

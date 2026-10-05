@@ -1,5 +1,7 @@
 package com.smartmeasure.ar.presentation.ar
 
+import com.smartmeasure.ar.domain.model.ArSessionSummary
+
 data class ArMeasurementUiState(
     val sessionReady: Boolean = false,
     val tracking: Boolean = false,
@@ -7,6 +9,8 @@ data class ArMeasurementUiState(
     val capturedPoints: Int = 0,
     val distanceMeters: Double? = null,
     val message: ArMeasurementMessage = ArMeasurementMessage.STARTING,
+    /** Path and tracking quality of the current AR session; null until the first update. */
+    val sessionSummary: ArSessionSummary? = null,
 )
 
 enum class ArMeasurementMessage {
