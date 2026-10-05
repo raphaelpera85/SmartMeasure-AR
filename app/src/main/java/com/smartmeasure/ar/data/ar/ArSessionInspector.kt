@@ -1,10 +1,12 @@
 package com.smartmeasure.ar.data.ar
 
 import android.app.Activity
+import android.util.Log
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.FatalException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
@@ -25,37 +27,15 @@ class ArSessionInspector {
             ArCoreApk.InstallStatus.INSTALL_REQUESTED -> ArPreparationResult.InstallRequested
             ArCoreApk.InstallStatus.INSTALLED -> inspectSession(activity)
         }
-    } catch (_: UnavailableDeviceNotCompatibleException) {
-        failed(ArPreparationFailure.DEVICE_INCOMPATIBLE)
-    } catch (_: UnavailableArcoreNotInstalledException) {
-        failed(ArPreparationFailure.ARCORE_NOT_INSTALLED)
-    } catch (_: UnavailableApkTooOldException) {
-        failed(ArPreparationFailure.ARCORE_TOO_OLD)
-    } catch (_: UnavailableSdkTooOldException) {
-        failed(ArPreparationFailure.SDK_TOO_OLD)
-    } catch (_: UnavailableUserDeclinedInstallationException) {
-        failed(ArPreparationFailure.INSTALL_DECLINED)
-    } catch (_: SecurityException) {
-        failed(ArPreparationFailure.CAMERA_UNAVAILABLE)
-    } catch (_: Exception) {
-        failed(ArPreparationFailure.UNKNOWN)
+    } catch (e: Exception) {
+        failed(stage = "install check", error = e)
     }
 
     private fun inspectSession(activity: Activity): ArPreparationResult {
         val session = try {
             Session(activity)
-        } catch (_: UnavailableDeviceNotCompatibleException) {
-            return failed(ArPreparationFailure.DEVICE_INCOMPATIBLE)
-        } catch (_: UnavailableArcoreNotInstalledException) {
-            return failed(ArPreparationFailure.ARCORE_NOT_INSTALLED)
-        } catch (_: UnavailableApkTooOldException) {
-            return failed(ArPreparationFailure.ARCORE_TOO_OLD)
-        } catch (_: UnavailableSdkTooOldException) {
-            return failed(ArPreparationFailure.SDK_TOO_OLD)
-        } catch (_: SecurityException) {
-            return failed(ArPreparationFailure.CAMERA_UNAVAILABLE)
-        } catch (_: Exception) {
-            return failed(ArPreparationFailure.UNKNOWN)
+        } catch (e: Exception) {
+            return failed(stage = "session creation", error = e)
         }
 
         return try {
@@ -76,18 +56,34 @@ class ArSessionInspector {
                 depthSupport = depthSupport,
                 planeFindingSupport = PlaneFindingSupport.HORIZONTAL_AND_VERTICAL,
             )
-        } catch (_: UnsupportedConfigurationException) {
-            failed(ArPreparationFailure.CONFIGURATION_UNSUPPORTED)
-        } catch (_: CameraNotAvailableException) {
-            failed(ArPreparationFailure.CAMERA_UNAVAILABLE)
-        } catch (_: Exception) {
-            failed(ArPreparationFailure.UNKNOWN)
+        } catch (e: Exception) {
+            failed(stage = "session configuration", error = e)
         } finally {
             session.close()
         }
     }
 
-    private fun failed(reason: ArPreparationFailure) =
-        ArPreparationResult.Failed(reason)
+    private fun failed(stage: String, error: Exception): ArPreparationResult.Failed {
+        val reason: ArPreparationFailure = error.toRawArFailure().toPreparationFailure()
+        Log.w(
+            AR_LOG_TAG,
+            arFailureLogMessage(stage, error.javaClass.name, error.message) + " -> $reason",
+            error,
+        )
+        return ArPreparationResult.Failed(reason)
+    }
 }
 
+/** Classifies ARCore/Android exceptions; the testable mapping lives in [toPreparationFailure]. */
+internal fun Exception.toRawArFailure(): RawArFailure = when (this) {
+    is UnavailableDeviceNotCompatibleException -> RawArFailure.DEVICE_NOT_COMPATIBLE
+    is UnavailableArcoreNotInstalledException -> RawArFailure.ARCORE_NOT_INSTALLED
+    is UnavailableApkTooOldException -> RawArFailure.APK_TOO_OLD
+    is UnavailableSdkTooOldException -> RawArFailure.SDK_TOO_OLD
+    is UnavailableUserDeclinedInstallationException -> RawArFailure.USER_DECLINED_INSTALLATION
+    is SecurityException -> RawArFailure.CAMERA_PERMISSION
+    is CameraNotAvailableException -> RawArFailure.CAMERA_NOT_AVAILABLE
+    is UnsupportedConfigurationException -> RawArFailure.UNSUPPORTED_CONFIGURATION
+    is FatalException -> RawArFailure.FATAL
+    else -> RawArFailure.OTHER
+}

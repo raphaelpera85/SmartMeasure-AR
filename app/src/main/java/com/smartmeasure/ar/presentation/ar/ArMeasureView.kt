@@ -4,6 +4,7 @@ import android.app.Activity
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.util.Log
 import android.view.Surface
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
@@ -46,6 +47,14 @@ class ArMeasureView(
     private companion object {
         /** Session summary publish interval (500 ms, at most 2 Hz) to limit UI recompositions. */
         const val SUMMARY_INTERVAL_NANOS = 500_000_000L
+
+        /** Same fixed tag as data/ar (presentation must not import data): `adb logcat -s SmartMeasureAR`. */
+        const val LOG_TAG = "SmartMeasureAR"
+
+        /** Logs only the stage and the exception class/message/stack (no personal data). */
+        fun logFailure(stage: String, error: Exception) {
+            Log.w(LOG_TAG, "AR $stage failed: ${error.javaClass.name}: ${error.message}", error)
+        }
     }
 
     init {
@@ -73,7 +82,8 @@ class ArMeasureView(
             activeSession.resume()
             sessionResumed = true
             super.onResume()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logFailure("session start", e)
             post { listener.onSessionError() }
         }
     }
@@ -116,6 +126,7 @@ class ArMeasureView(
         private var lastTracking: Boolean? = null
         private val pathRecorder = ArSessionPathRecorder()
         private var lastSummaryNanos = 0L
+        private var lastFrameError: String? = null
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             GLES20.glClearColor(0f, 0f, 0f, 1f)
@@ -156,7 +167,13 @@ class ArMeasureView(
                 if (captureRequested.getAndSet(false)) {
                     captureCenter(frame, tracking)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                // Logged once per distinct error so a failing frame loop does not flood logcat.
+                val signature = "${e.javaClass.name}: ${e.message}"
+                if (signature != lastFrameError) {
+                    lastFrameError = signature
+                    logFailure("frame update", e)
+                }
                 post { listener.onSessionError() }
             }
         }

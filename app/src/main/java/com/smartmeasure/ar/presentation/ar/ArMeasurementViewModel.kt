@@ -11,11 +11,18 @@ class ArMeasurementViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ArMeasurementUiState())
     val uiState: StateFlow<ArMeasurementUiState> = _uiState.asStateFlow()
 
+    /**
+     * A new ARCore session (first open or recreated after rotation) has no anchors, so the
+     * previous points, distance, tracking flag and session summary are discarded.
+     */
     fun onSessionReady(depthEnabled: Boolean) {
         _uiState.update {
             it.copy(
                 sessionReady = true,
+                tracking = false,
                 depthEnabled = depthEnabled,
+                capturedPoints = 0,
+                distanceMeters = null,
                 sessionSummary = null,
                 message = ArMeasurementMessage.MOVE_PHONE,
             )

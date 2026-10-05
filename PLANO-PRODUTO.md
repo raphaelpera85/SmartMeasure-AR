@@ -52,11 +52,11 @@ Permitir que uma pessoa faça levantamento guiado de cômodos com Android, revis
 | Correção de crash em Android 7–10 (`Activity#getDisplay`, API 30) | Feito; confirmado pelo lint `NewApi` | `ArMeasureView.kt` |
 | Registro de percurso e qualidade de rastreamento (distância percorrida com filtro de jitter de 2 cm, perdas de rastreamento, tempo rastreando, planos horizontais e verticais), exibido na tela AR | Feito (especialista de ARCore; verificado pela Qualidade, com ressalvas menores); não validado em aparelho | `domain/model/ArSessionPathRecorder.kt`, `presentation/ar/*` |
 | Emuladores e roteiros de uso (`tools/emulator/`, R1–R6) nos AVDs `SmartMeasureApi24` e `SmartMeasureApi35Play` (API 37 instável nesta máquina) | Feito; a primeira rodada achou defeitos (abaixo) | `tools/emulator/README.md` |
-| Defeitos de uso no emulador: R2.11 (voltar do sistema), R6.1/R6.2 (rotação) e R6.3 (morte de processo) corrigidos com `AppNavigationViewModel` + `SavedStateHandle` e testes instrumentados verdes; R5.3 (erro do modo manual) corrigido com erro tipado + string traduzida; ainda abertos: R4.2 ("Preparar AR" falha no emulador sem causa registrada), rascunho perdido na morte de processo, estado da medição AR após rotação | Parcial | evidências na pasta scratch `smartmeasure-usage/2026-10-05` |
+| Defeitos de uso no emulador: R2.11 (voltar do sistema), R6.1/R6.2 (rotação) e R6.3 (morte de processo) corrigidos com `AppNavigationViewModel` + `SavedStateHandle` e testes instrumentados verdes; R5.3 (erro do modo manual) corrigido com erro tipado + string traduzida; R4.2 diagnosticado: o ARCore 1.56 procura a câmera "0" e o AVD só expõe a câmera 10, então é limitação do emulador; as falhas de AR passaram a ir para o logcat com a tag `SmartMeasureAR`; a medição AR é zerada ao recriar a sessão; ainda aberto: rascunho perdido na morte de processo | Parcial | evidências na pasta scratch `smartmeasure-usage/2026-10-05` |
 | Rodada real de ensaios: matriz de aparelhos, cômodos claros/escuros/lisos/reflexivos/pequenos | Pendente; depende de aparelhos físicos e trena laser | Exportar o CSV de cada aparelho |
 | Tabela de decisão (requisitos mínimos/fallback) | Pendente; depende da rodada real | — |
 
-**Gate atual:** 119 testes unitários passando e 9/9 testes instrumentados verdes no emulador da API 35, `assembleDebug` e `lintDebug` sem erros.
+**Gate atual:** 127 testes unitários passando e 9/9 testes instrumentados verdes no emulador da API 35, `assembleDebug` e `lintDebug` sem erros.
 
 ## Fases sugeridas
 
