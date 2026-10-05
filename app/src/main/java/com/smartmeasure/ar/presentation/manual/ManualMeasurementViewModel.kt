@@ -12,11 +12,11 @@ class ManualMeasurementViewModel : ViewModel() {
     val uiState: StateFlow<ManualMeasurementUiState> = _uiState.asStateFlow()
 
     fun onWidthChanged(value: String) {
-        _uiState.update { it.copy(widthInput = value, geometry = null, validationMessage = null) }
+        _uiState.update { it.copy(widthInput = value, geometry = null, inputError = null) }
     }
 
     fun onLengthChanged(value: String) {
-        _uiState.update { it.copy(lengthInput = value, geometry = null, validationMessage = null) }
+        _uiState.update { it.copy(lengthInput = value, geometry = null, inputError = null) }
     }
 
     fun calculateRectangle() {
@@ -27,7 +27,7 @@ class ManualMeasurementViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     geometry = null,
-                    validationMessage = "Enter width and length greater than zero.",
+                    inputError = ManualInputError.INVALID_DIMENSIONS,
                 )
             }
             return
@@ -36,7 +36,7 @@ class ManualMeasurementViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 geometry = RoomGeometry.rectangle(width, length),
-                validationMessage = null,
+                inputError = null,
             )
         }
     }

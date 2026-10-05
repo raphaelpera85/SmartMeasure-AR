@@ -41,6 +41,7 @@
     <string name="length_meters">Length (m)</string>
     <string name="calculate">Calculate</string>
     <string name="back">Back</string>
+    <string name="manual_error_invalid_dimensions">Enter a width and a length greater than zero, in meters (e.g. 3.5).</string>
     <string name="manual_result_title">Room estimate</string>
     <string name="area_result">Area: %1$s m²</string>
     <string name="perimeter_result">Perimeter: %1$s m</string>

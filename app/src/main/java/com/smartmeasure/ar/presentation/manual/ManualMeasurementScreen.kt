@@ -1,5 +1,6 @@
 package com.smartmeasure.ar.presentation.manual
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,8 +67,8 @@ fun ManualMeasurementScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            uiState.validationMessage?.let { message ->
-                Text(message, color = MaterialTheme.colorScheme.error)
+            uiState.inputError?.let { error ->
+                Text(stringResource(error.messageRes()), color = MaterialTheme.colorScheme.error)
             }
 
             uiState.geometry?.let { geometry ->
@@ -112,6 +113,11 @@ fun ManualMeasurementScreen(
             )
         }
     }
+}
+
+@StringRes
+private fun ManualInputError.messageRes(): Int = when (this) {
+    ManualInputError.INVALID_DIMENSIONS -> R.string.manual_error_invalid_dimensions
 }
 
 private fun formatNumber(value: Double): String =

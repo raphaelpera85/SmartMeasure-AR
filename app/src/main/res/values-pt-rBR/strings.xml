@@ -41,6 +41,7 @@
     <string name="length_meters">Comprimento (m)</string>
     <string name="calculate">Calcular</string>
     <string name="back">Voltar</string>
+    <string name="manual_error_invalid_dimensions">Informe largura e comprimento maiores que zero, em metros (ex.: 3,5).</string>
     <string name="manual_result_title">Estimativa do cômodo</string>
     <string name="area_result">Área: %1$s m²</string>
     <string name="perimeter_result">Perímetro: %1$s m</string>

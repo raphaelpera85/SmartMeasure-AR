@@ -1,6 +1,5 @@
 package com.smartmeasure.ar.presentation.trials
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -88,7 +87,6 @@ fun FieldTrialsScreen(
     onRecoverStorage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onBack)
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmRecovery by rememberSaveable { mutableStateOf(false) }
 
