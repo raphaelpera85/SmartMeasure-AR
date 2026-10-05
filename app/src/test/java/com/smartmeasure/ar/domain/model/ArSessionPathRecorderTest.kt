@@ -35,6 +35,30 @@ class ArSessionPathRecorderTest : StringSpec({
         recorder.summary().distanceMeters shouldBe (3.5 plusOrMinus 0.01)
     }
 
+    "a step of exactly the threshold counts despite float rounding" {
+        val recorder = ArSessionPathRecorder()
+        recorder.track(1, 0f, 0f, 0f)
+        // 0.02f widens to 0.0199999995 in double; it must still count as a 2 cm step.
+        recorder.track(2, 0.02f, 0f, 0f)
+
+        recorder.summary().distanceMeters shouldBe (0.02 plusOrMinus 1e-6)
+    }
+
+    "drift of 1 cm per frame over 10 frames sums 10 cm" {
+        val recorder = ArSessionPathRecorder()
+        for (i in 0..10) recorder.track(i + 1, i * 0.01f, 1.4f, 0f)
+
+        recorder.summary().distanceMeters shouldBe (0.10 plusOrMinus 1e-5)
+    }
+
+    "slow drift below the threshold per frame accumulates against the reference point" {
+        val recorder = ArSessionPathRecorder()
+        // 0.5 cm per frame for 40 frames: no single frame moves 2 cm, but the path is 20 cm.
+        for (i in 0..40) recorder.track(i + 1, i * 0.005f, 1.4f, 0f)
+
+        recorder.summary().distanceMeters shouldBe (0.20 plusOrMinus 0.001)
+    }
+
     "jump after tracking loss is not summed and counts one loss" {
         val recorder = ArSessionPathRecorder()
         recorder.track(1, 0f, 0f, 0f)
@@ -74,6 +98,17 @@ class ArSessionPathRecorderTest : StringSpec({
         summary.trackingSeconds shouldBe (1.5 plusOrMinus 1e-9)
     }
 
+    "an interval takes the tracking state of its starting sample, not the ending one" {
+        val recorder = ArSessionPathRecorder()
+        val ms = 1_000_000L
+        recorder.addSample(0, tracking = true, x = 0f, y = 0f, z = 0f)
+        recorder.addSample(100 * ms, tracking = false, x = 0f, y = 0f, z = 0f)
+
+        val summary = recorder.summary()
+        summary.durationSeconds shouldBe (0.1 plusOrMinus 1e-9)
+        summary.trackingSeconds shouldBe (0.1 plusOrMinus 1e-9)
+    }
+
     "gap longer than the limit (paused session) adds neither time nor distance" {
         val recorder = ArSessionPathRecorder()
         val ms = 1_000_000L
@@ -87,6 +122,35 @@ class ArSessionPathRecorderTest : StringSpec({
         summary.trackingSeconds shouldBe (0.2 plusOrMinus 1e-9)
         summary.distanceMeters shouldBe (0.2 plusOrMinus 0.001)
         summary.trackingLosses shouldBe 0
+    }
+
+    "interruption shorter than the gap limit adds neither time nor distance" {
+        val recorder = ArSessionPathRecorder()
+        val ms = 1_000_000L
+        recorder.addSample(0, tracking = true, x = 0f, y = 0f, z = 0f)
+        recorder.addSample(100 * ms, tracking = true, x = 0.1f, y = 0f, z = 0f)
+        // Session paused for 500 ms (< 1 s) and the user walked 0.9 m meanwhile.
+        recorder.markInterrupted()
+        recorder.addSample(600 * ms, tracking = true, x = 1.0f, y = 0f, z = 0f)
+        recorder.addSample(700 * ms, tracking = true, x = 1.1f, y = 0f, z = 0f)
+
+        val summary = recorder.summary()
+        summary.durationSeconds shouldBe (0.2 plusOrMinus 1e-9)
+        summary.trackingSeconds shouldBe (0.2 plusOrMinus 1e-9)
+        summary.distanceMeters shouldBe (0.2 plusOrMinus 0.001)
+        summary.trackingLosses shouldBe 0
+    }
+
+    "interruption before any sample is harmless" {
+        val recorder = ArSessionPathRecorder()
+        val ms = 1_000_000L
+        recorder.markInterrupted()
+        recorder.addSample(0, tracking = true, x = 0f, y = 0f, z = 0f)
+        recorder.addSample(100 * ms, tracking = true, x = 0.1f, y = 0f, z = 0f)
+
+        val summary = recorder.summary()
+        summary.durationSeconds shouldBe (0.1 plusOrMinus 1e-9)
+        summary.distanceMeters shouldBe (0.1 plusOrMinus 0.001)
     }
 
     "summary carries the tracked plane counts" {

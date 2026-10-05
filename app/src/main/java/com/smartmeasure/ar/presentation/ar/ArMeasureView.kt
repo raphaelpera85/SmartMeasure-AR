@@ -81,6 +81,9 @@ class ArMeasureView(
     fun onHostPause() {
         if (!sessionResumed) return
         super.onPause()
+        // GLSurfaceView#onPause returns only after the GL thread has paused, so no frame is in
+        // flight here; the flag is consumed by the first frame after resume (see recordPath).
+        renderer.sessionInterrupted.set(true)
         session?.pause()
         sessionResumed = false
     }
@@ -102,6 +105,9 @@ class ArMeasureView(
 
     private inner class ArRenderer : Renderer {
         val captureRequested = AtomicBoolean(false)
+
+        /** Set on the main thread when the session pauses; the recorder is GL-thread only. */
+        val sessionInterrupted = AtomicBoolean(false)
         private val backgroundRenderer = CameraBackgroundRenderer()
         private var surfaceWidth = 0
         private var surfaceHeight = 0
@@ -156,6 +162,9 @@ class ArMeasureView(
         }
 
         private fun recordPath(session: Session, frame: Frame, tracking: Boolean) {
+            // A pause shorter than the recorder's gap limit must not count as session time.
+            if (sessionInterrupted.getAndSet(false)) pathRecorder.markInterrupted()
+
             val timestamp = frame.timestamp
             // ARCore may return a frame with timestamp 0 before the camera delivers images.
             if (timestamp == 0L) return

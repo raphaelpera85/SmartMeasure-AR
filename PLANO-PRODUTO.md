@@ -52,7 +52,7 @@ Permitir que uma pessoa faça levantamento guiado de cômodos com Android, revis
 | Rodada real de ensaios: matriz de aparelhos, cômodos claros/escuros/lisos/reflexivos/pequenos | Pendente; depende de aparelhos físicos e trena laser | Exportar o CSV de cada aparelho |
 | Tabela de decisão (requisitos mínimos/fallback) | Pendente; depende da rodada real | — |
 
-**Gate atual:** 55 testes unitários passando, `assembleDebug` e `lintDebug` sem erros.
+**Gate atual:** 61 testes unitários passando, `assembleDebug` e `lintDebug` sem erros.
 
 ## Fases sugeridas
 
@@ -121,6 +121,6 @@ Fontes primárias e limitações estão em [.agents/skills/FONTES.md](.agents/sk
 ## Próxima etapa
 
 1. Instalar o APK de debug em aparelhos reais e fazer a primeira rodada de ensaios: paredes, vãos e alturas, com e sem Depth, nas condições listadas. Exportar o CSV de cada aparelho.
-2. Ressalvas do registro de percurso: borda exata de 2 cm, testes de deriva lenta e de tempo com intervalos assimétricos, pausa curta. Depois, levar o resumo da sessão para o ensaio e o CSV (mudança de formato; especialistas de Arquitetura e Geometria).
+2. Levar o resumo da sessão para o ensaio e o CSV (mudança de formato; especialistas de Arquitetura e Geometria).
 3. Usar espaço não separável também nos resultados da medição manual e da tela AR (`area_result`, `perimeter_result`, `ar_distance_result`).
 4. Com os dados reais, definir requisitos mínimos de aparelho, política de fallback e limites de aceitação.
