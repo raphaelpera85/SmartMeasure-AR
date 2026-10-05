@@ -4,6 +4,7 @@ import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.MeasurementKind
+import com.smartmeasure.ar.domain.repository.TrialStorageStatus
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -57,6 +58,10 @@ private val V1_TRIALS = listOf(
         referenceMeters = 0.8,
     ),
 )
+
+/** An unknown header followed by bytes that are not valid UTF-8, to prove the backup is byte-exact. */
+private val UNREADABLE_BYTES =
+    "smartmeasure-field-trials\tv9\nfuture\tline\r\n".toByteArray() + byteArrayOf(0xFF.toByte(), 0x00, 0xC3.toByte())
 
 /** v2 line: the 8 v1 fields followed by the 6 session fields. */
 private fun v2Line(id: String, sessionFields: String) =
@@ -131,6 +136,11 @@ class FieldTrialCodecTest : StringSpec({
         FieldTrialCodec.decode("") shouldBe emptyList()
     }
 
+    "an empty or whitespace-only text can be overwritten" {
+        FieldTrialCodec.canOverwrite("") shouldBe true
+        FieldTrialCodec.canOverwrite(" \n\t\r\n\n") shouldBe true
+    }
+
     "windows line endings are tolerated" {
         val text = FieldTrialCodec.encode(listOf(sample("a", 1L).copy(session = session)))
             .replace("\n", "\r\n")
@@ -190,6 +200,165 @@ class FileFieldTrialRepositoryTest : StringSpec({
             file.readText().lines().first() shouldBe "smartmeasure-field-trials\tv2"
             FileFieldTrialRepository(file).observeTrials().first() shouldBe
                 listOf(withSession) + V1_TRIALS
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "a zero-byte file stays writable and is rewritten as v2" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            file.writeBytes(ByteArray(0))
+            val repository = FileFieldTrialRepository(file)
+            repository.observeTrials().first() shouldBe emptyList()
+
+            repository.add(sample("a", 1L))
+
+            file.readText().lines().first() shouldBe "smartmeasure-field-trials\tv2"
+            FileFieldTrialRepository(file).observeTrials().first().map { it.id } shouldBe listOf("a")
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "a whitespace-only file stays writable and is rewritten as v2" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            file.writeText(" \n\t\r\n\n")
+            val repository = FileFieldTrialRepository(file)
+            repository.observeTrials().first() shouldBe emptyList()
+
+            repository.add(sample("a", 1L))
+
+            file.readText().lines().first() shouldBe "smartmeasure-field-trials\tv2"
+            FileFieldTrialRepository(file).observeTrials().first().map { it.id } shouldBe listOf("a")
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "a header this version cannot read is reported as UNREADABLE" {
+        for (content in listOf("smartmeasure-field-trials\tv3\nsome\tfuture\tline\n", "garbage\n")) {
+            val dir = Files.createTempDirectory("trials").toFile()
+            try {
+                val file = dir.resolve("t.tsv")
+                file.writeText(content)
+                val repository = FileFieldTrialRepository(file)
+
+                repository.observeStorageStatus().first() shouldBe TrialStorageStatus.UNREADABLE
+                repository.observeTrials().first() shouldBe emptyList()
+            } finally {
+                dir.deleteRecursively()
+            }
+        }
+    }
+
+    "an absent, zero-byte, whitespace-only, v1 or v2 file is OK" {
+        val contents = listOf(null, "", " \n\t\r\n", V1_FILE, FieldTrialCodec.encode(listOf(sample("a", 1L))))
+        for (content in contents) {
+            val dir = Files.createTempDirectory("trials").toFile()
+            try {
+                val file = dir.resolve("t.tsv")
+                content?.let(file::writeText)
+
+                FileFieldTrialRepository(file).observeStorageStatus().first() shouldBe TrialStorageStatus.OK
+            } finally {
+                dir.deleteRecursively()
+            }
+        }
+    }
+
+    "recover moves an unreadable file to a timestamped backup with identical bytes" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            file.writeBytes(UNREADABLE_BYTES)
+            val repository = FileFieldTrialRepository(file, clock = { 1234L })
+            repository.observeStorageStatus().first() shouldBe TrialStorageStatus.UNREADABLE
+
+            repository.recoverUnreadableStorage()
+
+            val backup = dir.resolve("t.tsv.unreadable-1234.bak")
+            backup.readBytes().toList() shouldBe UNREADABLE_BYTES.toList()
+            file.exists() shouldBe false
+            repository.observeStorageStatus().first() shouldBe TrialStorageStatus.OK
+            repository.observeTrials().first() shouldBe emptyList()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "after recover, add works, writes v2 and leaves the backup untouched" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            file.writeBytes(UNREADABLE_BYTES)
+            val repository = FileFieldTrialRepository(file, clock = { 1234L })
+            repository.recoverUnreadableStorage()
+
+            repository.add(sample("a", 1L))
+
+            file.readText().lines().first() shouldBe "smartmeasure-field-trials\tv2"
+            FileFieldTrialRepository(file).observeTrials().first().map { it.id } shouldBe listOf("a")
+            dir.resolve("t.tsv.unreadable-1234.bak").readBytes().toList() shouldBe UNREADABLE_BYTES.toList()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "a failed backup reports an error and keeps the file and the write block" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            file.writeBytes(UNREADABLE_BYTES)
+            val repository = FileFieldTrialRepository(file, clock = { 1234L }, moveFile = { _, _ -> false })
+
+            shouldThrow<IllegalStateException> { repository.recoverUnreadableStorage() }
+
+            repository.observeStorageStatus().first() shouldBe TrialStorageStatus.UNREADABLE
+            shouldThrow<IllegalStateException> { repository.add(sample("a", 1L)) }
+            file.readBytes().toList() shouldBe UNREADABLE_BYTES.toList()
+            dir.list()!!.toList() shouldBe listOf("t.tsv")
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "recover never overwrites an existing backup with the same timestamp" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            file.writeBytes(UNREADABLE_BYTES)
+            val earlier = dir.resolve("t.tsv.unreadable-1234.bak")
+            earlier.writeText("earlier backup")
+            val repository = FileFieldTrialRepository(file, clock = { 1234L })
+
+            repository.recoverUnreadableStorage()
+
+            earlier.readText() shouldBe "earlier backup"
+            val backups = dir.listFiles()!!.filter { it.name.endsWith(".bak") && it != earlier }
+            backups.single().readBytes().toList() shouldBe UNREADABLE_BYTES.toList()
+            file.exists() shouldBe false
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    "recover does nothing when the storage is readable" {
+        val dir = Files.createTempDirectory("trials").toFile()
+        try {
+            val file = dir.resolve("t.tsv")
+            val repository = FileFieldTrialRepository(file, clock = { 1234L })
+            repository.add(sample("a", 1L))
+            val before = file.readText()
+
+            repository.recoverUnreadableStorage()
+
+            file.readText() shouldBe before
+            dir.list()!!.toList() shouldBe listOf("t.tsv")
+            repository.observeTrials().first().map { it.id } shouldBe listOf("a")
         } finally {
             dir.deleteRecursively()
         }

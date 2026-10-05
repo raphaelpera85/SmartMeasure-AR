@@ -5,6 +5,7 @@ import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.MeasurementKind
 import com.smartmeasure.ar.domain.repository.FieldTrialRepository
+import com.smartmeasure.ar.domain.repository.TrialStorageStatus
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -21,8 +22,12 @@ import java.util.Locale
 private class FakeFieldTrialRepository(
     initial: List<FieldTrial> = emptyList(),
     var failWrites: Boolean = false,
+    initialStatus: TrialStorageStatus = TrialStorageStatus.OK,
+    var failRecovery: Boolean = false,
 ) : FieldTrialRepository {
     val trials = MutableStateFlow(initial)
+    val status = MutableStateFlow(initialStatus)
+    var recoverCalls = 0
 
     override fun observeTrials(): Flow<List<FieldTrial>> = trials
 
@@ -34,6 +39,17 @@ private class FakeFieldTrialRepository(
     override suspend fun delete(id: String) {
         if (failWrites) error("disk full")
         trials.value = trials.value.filterNot { it.id == id }
+    }
+
+    override fun observeStorageStatus(): Flow<TrialStorageStatus> = status
+
+    override suspend fun recoverUnreadableStorage() {
+        recoverCalls++
+        if (failRecovery) error("rename refused")
+        if (status.value == TrialStorageStatus.UNREADABLE) {
+            trials.value = emptyList()
+            status.value = TrialStorageStatus.OK
+        }
     }
 }
 
@@ -204,6 +220,57 @@ class FieldTrialsViewModelTest : StringSpec({
         vm.delete("a")
 
         vm.uiState.value.trials shouldBe emptyList()
+    }
+
+    "a failed delete is surfaced as saveFailed and keeps the trial" {
+        val stored = FieldTrial("a", 1L, "Acme One", false, MeasurementKind.WALL, 3.02, 3.0)
+        val vm = viewModel(FakeFieldTrialRepository(listOf(stored), failWrites = true))
+
+        vm.delete("a")
+
+        vm.uiState.value.saveFailed shouldBe true
+        vm.uiState.value.trials shouldBe listOf(stored)
+    }
+
+    "an unreadable storage is reflected in the ui state" {
+        viewModel(FakeFieldTrialRepository()).uiState.value.storageUnreadable shouldBe false
+
+        val vm = viewModel(FakeFieldTrialRepository(initialStatus = TrialStorageStatus.UNREADABLE))
+
+        vm.uiState.value.storageUnreadable shouldBe true
+    }
+
+    "recoverStorage asks the repository to recover and clears storageUnreadable" {
+        val repository = FakeFieldTrialRepository(initialStatus = TrialStorageStatus.UNREADABLE)
+        val vm = viewModel(repository)
+
+        vm.recoverStorage()
+
+        repository.recoverCalls shouldBe 1
+        vm.uiState.value.storageUnreadable shouldBe false
+        vm.uiState.value.recoveryFailed shouldBe false
+    }
+
+    "a failed recovery is reported and storage stays unreadable" {
+        val repository = FakeFieldTrialRepository(initialStatus = TrialStorageStatus.UNREADABLE, failRecovery = true)
+        val vm = viewModel(repository)
+
+        vm.recoverStorage()
+
+        vm.uiState.value.recoveryFailed shouldBe true
+        vm.uiState.value.storageUnreadable shouldBe true
+    }
+
+    "a new recovery attempt clears the previous recovery failure" {
+        val repository = FakeFieldTrialRepository(initialStatus = TrialStorageStatus.UNREADABLE, failRecovery = true)
+        val vm = viewModel(repository)
+        vm.recoverStorage()
+
+        repository.failRecovery = false
+        vm.recoverStorage()
+
+        vm.uiState.value.recoveryFailed shouldBe false
+        vm.uiState.value.storageUnreadable shouldBe false
     }
 
     "export produces csv for the current trials" {

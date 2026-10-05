@@ -11,6 +11,7 @@ import com.smartmeasure.ar.domain.model.MeasurementKind
 import com.smartmeasure.ar.domain.model.TrialStatistics
 import com.smartmeasure.ar.domain.model.TrialSummary
 import com.smartmeasure.ar.domain.repository.FieldTrialRepository
+import com.smartmeasure.ar.domain.repository.TrialStorageStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,10 @@ data class FieldTrialsUiState(
     val inputError: TrialInputError? = null,
     val saveFailed: Boolean = false,
     val justSaved: Boolean = false,
+    /** The stored trials cannot be read; writes fail until [FieldTrialsViewModel.recoverStorage]. */
+    val storageUnreadable: Boolean = false,
+    /** The last [FieldTrialsViewModel.recoverStorage] could not move the file aside. */
+    val recoveryFailed: Boolean = false,
 )
 
 class FieldTrialsViewModel(
@@ -48,6 +53,11 @@ class FieldTrialsViewModel(
                         summaries = TrialStatistics.summarize(trials),
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            repository.observeStorageStatus().collect { status ->
+                _uiState.update { it.copy(storageUnreadable = status == TrialStorageStatus.UNREADABLE) }
             }
         }
     }
@@ -112,6 +122,14 @@ class FieldTrialsViewModel(
     }
 
     fun exportCsv(): String = FieldTrialCsv.encode(_uiState.value.trials)
+
+    fun recoverStorage() {
+        _uiState.update { it.copy(recoveryFailed = false) }
+        viewModelScope.launch {
+            runCatching { repository.recoverUnreadableStorage() }
+                .onFailure { _uiState.update { it.copy(recoveryFailed = true) } }
+        }
+    }
 
     private fun updateDraft(transform: (TrialDraft) -> TrialDraft) {
         _uiState.update {

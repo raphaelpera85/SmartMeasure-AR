@@ -2,6 +2,7 @@ package com.smartmeasure.ar.data.trial
 
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.repository.FieldTrialRepository
+import com.smartmeasure.ar.domain.repository.TrialStorageStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,17 +21,54 @@ import java.io.File
 class FileFieldTrialRepository(
     private val file: File,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** Timestamp for the backup name of an unreadable file. */
+    private val clock: () -> Long = System::currentTimeMillis,
+    /** Renames without replacing; injectable so the failure path can be tested. */
+    private val moveFile: (from: File, to: File) -> Boolean = { from, to -> from.renameTo(to) },
 ) : FieldTrialRepository {
     private val mutex = Mutex()
     private val trials = MutableStateFlow<List<FieldTrial>?>(null)
 
-    /** Set on load when the existing file has a header this version cannot read. Guarded by [mutex]. */
-    private var unsupportedFile = false
+    /** Null until the file is first read; written only while holding [mutex]. */
+    private val status = MutableStateFlow<TrialStorageStatus?>(null)
 
     override fun observeTrials(): Flow<List<FieldTrial>> =
         trials
             .onStart { mutex.withLock { loadLocked() } }
             .filterNotNull()
+
+    override fun observeStorageStatus(): Flow<TrialStorageStatus> =
+        status
+            .onStart { mutex.withLock { loadLocked() } }
+            .filterNotNull()
+
+    /**
+     * Moves an unreadable file to `<name>.unreadable-<epochMillis>.bak` in the same directory (never
+     * deleting or overwriting anything), then allows writes again with an empty list. The original
+     * stays in place and writes stay blocked when the move fails.
+     */
+    override suspend fun recoverUnreadableStorage() {
+        mutex.withLock {
+            loadLocked()
+            if (status.value != TrialStorageStatus.UNREADABLE) return
+            withContext(ioDispatcher) {
+                val backup = backupFile()
+                check(moveFile(file, backup) && !file.exists()) {
+                    "Could not move the unreadable field trial file aside."
+                }
+            }
+            trials.value = emptyList()
+            status.value = TrialStorageStatus.OK
+        }
+    }
+
+    /** First backup name that does not exist yet, so an earlier backup is never replaced. */
+    private fun backupFile(): File {
+        val base = "${file.name}.unreadable-${clock()}"
+        return generateSequence(0) { it + 1 }
+            .map { n -> File(file.parentFile, if (n == 0) "$base.bak" else "$base-$n.bak") }
+            .first { !it.exists() }
+    }
 
     override suspend fun add(trial: FieldTrial) = mutate { current ->
         (listOf(trial) + current.filterNot { it.id == trial.id })
@@ -44,7 +82,7 @@ class FileFieldTrialRepository(
     private suspend fun mutate(transform: (List<FieldTrial>) -> List<FieldTrial>) {
         mutex.withLock {
             val current = loadLocked()
-            check(!unsupportedFile) {
+            check(status.value == TrialStorageStatus.OK) {
                 "Field trial file has an unsupported format version; refusing to overwrite it."
             }
             val updated = transform(current)
@@ -60,13 +98,21 @@ class FileFieldTrialRepository(
 
     /**
      * v1 and v2 files are read (v1 is rewritten as v2 on the next write). A file with any other
-     * header — typically written by a newer app version — shows no trials and is never
-     * overwritten: writes fail with [IllegalStateException], which the caller reports.
+     * header — typically written by a newer app version — shows no trials, is reported as
+     * [TrialStorageStatus.UNREADABLE] and is never overwritten: writes fail with
+     * [IllegalStateException], which the caller reports.
      */
     private fun read(): List<FieldTrial> {
-        if (!file.exists()) return emptyList()
+        if (!file.exists()) {
+            status.value = TrialStorageStatus.OK
+            return emptyList()
+        }
         val text = file.readText()
-        unsupportedFile = !FieldTrialCodec.canOverwrite(text)
+        status.value = if (FieldTrialCodec.canOverwrite(text)) {
+            TrialStorageStatus.OK
+        } else {
+            TrialStorageStatus.UNREADABLE
+        }
         return FieldTrialCodec.decode(text)
     }
 
