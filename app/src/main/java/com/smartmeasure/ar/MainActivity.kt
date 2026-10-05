@@ -6,13 +6,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.smartmeasure.ar.data.ar.ArCoreAvailabilityRepository
@@ -28,6 +26,8 @@ import com.smartmeasure.ar.presentation.diagnostics.DiagnosticsScreen
 import com.smartmeasure.ar.presentation.diagnostics.DiagnosticsViewModel
 import com.smartmeasure.ar.presentation.manual.ManualMeasurementScreen
 import com.smartmeasure.ar.presentation.manual.ManualMeasurementViewModel
+import com.smartmeasure.ar.presentation.navigation.AppNavigationViewModel
+import com.smartmeasure.ar.presentation.navigation.Destination
 import com.smartmeasure.ar.presentation.trials.FieldTrialsScreen
 import com.smartmeasure.ar.presentation.trials.FieldTrialsViewModel
 import com.smartmeasure.ar.ui.theme.SmartMeasureTheme
@@ -48,8 +48,8 @@ class MainActivity : ComponentActivity() {
             deviceModel = Build.MANUFACTURER + " " + Build.MODEL,
         )
     }
-    private var destination by mutableStateOf(Destination.DIAGNOSTICS)
-    private var fieldTrialsReturnDestination = Destination.DIAGNOSTICS
+    // Saved navigation: survives rotation (ViewModel) and process death (SavedStateHandle).
+    private val navigationViewModel: AppNavigationViewModel by viewModels()
 
     private var installRequested = false
 
@@ -69,6 +69,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SmartMeasureTheme {
+                val destination = navigationViewModel.destination.collectAsStateWithLifecycle().value
+                // Off the root screen, system back returns like the on-screen back; on Diagnostics it closes the app.
+                BackHandler(enabled = destination != Destination.DIAGNOSTICS) {
+                    navigationViewModel.back()
+                }
                 when (destination) {
                     Destination.DIAGNOSTICS -> {
                         val uiState = diagnosticsViewModel.uiState.collectAsStateWithLifecycle().value
@@ -76,14 +81,14 @@ class MainActivity : ComponentActivity() {
                             uiState = uiState,
                             onRefresh = diagnosticsViewModel::refreshAvailability,
                             onPrepareAr = ::requestPrepareAr,
-                            onOpenManualMode = { destination = Destination.MANUAL_MEASUREMENT },
+                            onOpenManualMode = { navigationViewModel.open(Destination.MANUAL_MEASUREMENT) },
                             onOpenFieldTrials = {
                                 fieldTrialsViewModel.startDraft(
                                     arMeters = null,
                                     depthEnabled = uiState.depthSupport == DepthSupport.SUPPORTED,
                                     session = null, // not started from AR: no session to record
                                 )
-                                openFieldTrials(from = Destination.DIAGNOSTICS)
+                                navigationViewModel.openFieldTrials(from = Destination.DIAGNOSTICS)
                             },
                         )
                     }
@@ -96,7 +101,7 @@ class MainActivity : ComponentActivity() {
                             onWidthChanged = manualMeasurementViewModel::onWidthChanged,
                             onLengthChanged = manualMeasurementViewModel::onLengthChanged,
                             onCalculate = manualMeasurementViewModel::calculateRectangle,
-                            onBack = { destination = Destination.DIAGNOSTICS },
+                            onBack = { navigationViewModel.back() },
                         )
                     }
 
@@ -146,9 +151,9 @@ class MainActivity : ComponentActivity() {
                                 )
                                 // Leaving disposes the AR view and its anchors; the value now lives in the draft.
                                 arMeasurementViewModel.onReset()
-                                openFieldTrials(from = Destination.AR_MEASUREMENT)
+                                navigationViewModel.openFieldTrials(from = Destination.AR_MEASUREMENT)
                             },
-                            onBack = { destination = Destination.DIAGNOSTICS },
+                            onBack = { navigationViewModel.back() },
                         )
                     }
 
@@ -165,7 +170,7 @@ class MainActivity : ComponentActivity() {
                             onSave = fieldTrialsViewModel::save,
                             onDelete = fieldTrialsViewModel::delete,
                             onExport = ::shareFieldTrialsCsv,
-                            onBack = { destination = fieldTrialsReturnDestination },
+                            onBack = { navigationViewModel.back() },
                             onRecoverStorage = fieldTrialsViewModel::recoverStorage,
                         )
                     }
@@ -200,13 +205,8 @@ class MainActivity : ComponentActivity() {
         installRequested = result is ArPreparationResult.InstallRequested
         diagnosticsViewModel.onPreparationResult(result)
         if (result is ArPreparationResult.Ready) {
-            destination = Destination.AR_MEASUREMENT
+            navigationViewModel.open(Destination.AR_MEASUREMENT)
         }
-    }
-
-    private fun openFieldTrials(from: Destination) {
-        fieldTrialsReturnDestination = from
-        destination = Destination.FIELD_TRIALS
     }
 
     /** Hands the CSV text to an app the user picks; nothing is sent without that explicit choice. */
@@ -224,13 +224,6 @@ class MainActivity : ComponentActivity() {
             this,
             Manifest.permission.CAMERA,
         ) == PackageManager.PERMISSION_GRANTED
-
-    private enum class Destination {
-        DIAGNOSTICS,
-        MANUAL_MEASUREMENT,
-        AR_MEASUREMENT,
-        FIELD_TRIALS,
-    }
 
     private companion object {
         const val FIELD_TRIALS_FILE = "field_trials.tsv"
