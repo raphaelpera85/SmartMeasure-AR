@@ -1,5 +1,6 @@
 package com.smartmeasure.ar.presentation.trials
 
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.MeasurementKind
@@ -70,17 +71,62 @@ class FieldTrialsViewModelTest : StringSpec({
         val vm = viewModel(FakeFieldTrialRepository())
         vm.onReferenceChanged("9")
 
-        vm.startDraft(arMeters = 2.4567, depthEnabled = true)
+        vm.startDraft(arMeters = 2.4567, depthEnabled = true, session = null)
 
         vm.uiState.value.draft.arInput shouldBe "2.457"
         vm.uiState.value.draft.referenceInput shouldBe ""
         vm.uiState.value.draft.depthEnabled shouldBe true
     }
 
+    "a trial recorded from the AR screen keeps the session summary captured then" {
+        val repository = FakeFieldTrialRepository()
+        val vm = viewModel(repository)
+        val session = ArSessionSummary(4.2, 1, 25.0, 24.0, 1, 2)
+
+        vm.startDraft(arMeters = 2.4567, depthEnabled = true, session = session)
+        vm.uiState.value.draft.session shouldBe session
+        vm.onReferenceChanged("2.45")
+        vm.save()
+
+        repository.trials.value.single().session shouldBe session
+    }
+
+    "manually editing the AR value keeps the session it came from" {
+        val repository = FakeFieldTrialRepository()
+        val vm = viewModel(repository)
+        val session = ArSessionSummary(4.2, 1, 25.0, 24.0, 1, 2)
+        vm.startDraft(arMeters = 2.4567, depthEnabled = true, session = session)
+
+        vm.onArChanged("2.46")
+        vm.onReferenceChanged("2.45")
+        vm.save()
+
+        repository.trials.value.single().session shouldBe session
+    }
+
+    "after saving, the next trial does not inherit the previous session" {
+        val repository = FakeFieldTrialRepository()
+        val vm = viewModel(repository)
+        vm.startDraft(arMeters = 2.0, depthEnabled = false, session = ArSessionSummary(1.0, 0, 5.0, 5.0, 0, 1))
+        vm.onReferenceChanged("2")
+        vm.save()
+
+        vm.uiState.value.draft.session shouldBe null
+    }
+
+    "a draft started without AR has no session even if a previous draft had one" {
+        val vm = viewModel(FakeFieldTrialRepository())
+        vm.startDraft(arMeters = 2.0, depthEnabled = false, session = ArSessionSummary(1.0, 0, 5.0, 5.0, 0, 1))
+
+        vm.startDraft(arMeters = null, depthEnabled = false, session = null)
+
+        vm.uiState.value.draft.session shouldBe null
+    }
+
     "saving a valid draft stores it and keeps kind, depth and conditions" {
         val repository = FakeFieldTrialRepository()
         val vm = viewModel(repository)
-        vm.startDraft(arMeters = null, depthEnabled = true)
+        vm.startDraft(arMeters = null, depthEnabled = true, session = null)
         vm.onKindSelected(MeasurementKind.HEIGHT)
         vm.onConditionToggled(CaptureCondition.LOW_LIGHT)
         vm.onArChanged("2,61")

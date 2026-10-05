@@ -46,13 +46,14 @@ Permitir que uma pessoa faça levantamento guiado de cômodos com Android, revis
 | Medição AR ponto a ponto (planos, pontos e Depth) | Feito; não validada em aparelho real | `presentation/ar/ArMeasureView.kt` |
 | Fallback manual retangular | Feito | `presentation/manual/*` |
 | Ensaios de precisão: medida AR × referência, por tipo de medida, Depth e condição; estatística (média, mediana, P90, máximo, viés, erro relativo); armazenamento local; exportação CSV | Feito, coberto por testes unitários; fluxo ainda não exercitado em aparelho | `domain/model/FieldTrial.kt`, `TrialStatistics.kt`, `FieldTrialCsv.kt`, `data/trial/*`, `presentation/trials/*` |
+| Resumo da sessão AR gravado em cada ensaio (formato v2 com migração automática da v1; arquivos de versão futura protegidos contra sobrescrita) e exportado no CSV | Feito (Geometria e Arquitetura; verificado pela Qualidade, com ressalvas) | `data/trial/*`, `domain/model/FieldTrial*.kt` |
 | Revisão de UX/acessibilidade da tela de ensaios (especialista de UI; verificada pela Qualidade, com ressalvas menores) | Feito; não verificada visualmente em aparelho | `presentation/trials/FieldTrialsScreen.kt` |
 | Correção de crash em Android 7–10 (`Activity#getDisplay`, API 30) | Feito; confirmado pelo lint `NewApi` | `ArMeasureView.kt` |
 | Registro de percurso e qualidade de rastreamento (distância percorrida com filtro de jitter de 2 cm, perdas de rastreamento, tempo rastreando, planos horizontais e verticais), exibido na tela AR | Feito (especialista de ARCore; verificado pela Qualidade, com ressalvas menores); não validado em aparelho | `domain/model/ArSessionPathRecorder.kt`, `presentation/ar/*` |
 | Rodada real de ensaios: matriz de aparelhos, cômodos claros/escuros/lisos/reflexivos/pequenos | Pendente; depende de aparelhos físicos e trena laser | Exportar o CSV de cada aparelho |
 | Tabela de decisão (requisitos mínimos/fallback) | Pendente; depende da rodada real | — |
 
-**Gate atual:** 75 testes unitários passando, `assembleDebug` e `lintDebug` sem erros.
+**Gate atual:** 87 testes unitários passando, `assembleDebug` e `lintDebug` sem erros.
 
 ## Fases sugeridas
 
@@ -121,6 +122,6 @@ Fontes primárias e limitações estão em [.agents/skills/FONTES.md](.agents/sk
 ## Próxima etapa
 
 1. Instalar o APK de debug em aparelhos reais e fazer a primeira rodada de ensaios: paredes, vãos e alturas, com e sem Depth, nas condições listadas. Exportar o CSV de cada aparelho.
-2. Levar o resumo da sessão para o ensaio e o CSV (mudança de formato; especialistas de Arquitetura e Geometria).
+2. Arquivo de ensaios ilegível ou de versão futura: avisar o usuário e oferecer recuperação, movendo o arquivo para backup sem apagá-lo; faltam também testes de arquivo vazio e de falha ao excluir. Depois, mostrar o resumo da sessão em cada ensaio na tela.
 3. Usar espaço não separável também nos resultados da medição manual e da tela AR (`area_result`, `perimeter_result`, `ar_distance_result`).
 4. Com os dados reais, definir requisitos mínimos de aparelho, política de fallback e limites de aceitação.

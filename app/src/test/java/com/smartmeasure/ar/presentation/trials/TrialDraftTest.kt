@@ -1,5 +1,6 @@
 package com.smartmeasure.ar.presentation.trials
 
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.MeasurementKind
 import io.kotest.core.spec.style.StringSpec
@@ -26,6 +27,20 @@ class TrialDraftTest : StringSpec({
         trial.conditions shouldBe setOf(CaptureCondition.LOW_LIGHT)
         trial.recordedAtEpochMillis shouldBe 5L
         trial.deviceModel shouldBe "Phone"
+    }
+
+    "the AR session summary is carried into the trial" {
+        val session = ArSessionSummary(2.5, 1, 30.0, 28.0, 1, 2)
+
+        val trial = TrialDraft(arInput = "2", referenceInput = "2", session = session).convert()
+            .shouldBeInstanceOf<TrialDraft.Result.Valid>().trial
+
+        trial.session shouldBe session
+    }
+
+    "a draft without AR session yields a trial without session" {
+        TrialDraft(arInput = "2", referenceInput = "2").convert()
+            .shouldBeInstanceOf<TrialDraft.Result.Valid>().trial.session shouldBe null
     }
 
     "reports which field is invalid" {

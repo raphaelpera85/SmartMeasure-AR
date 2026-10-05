@@ -3,6 +3,7 @@ package com.smartmeasure.ar.presentation.trials
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.FieldTrialCsv
@@ -51,10 +52,15 @@ class FieldTrialsViewModel(
         }
     }
 
-    /** Starts a new draft, optionally prefilled with an AR measurement just captured. */
-    fun startDraft(arMeters: Double?, depthEnabled: Boolean) {
+    /**
+     * Starts a new draft, optionally prefilled with an AR measurement just captured and the summary
+     * of the AR session it came from ([session] is null when the draft is not started from AR).
+     */
+    fun startDraft(arMeters: Double?, depthEnabled: Boolean, session: ArSessionSummary?) {
         val arInput = arMeters?.let { String.format(Locale.getDefault(), "%.3f", it) }.orEmpty()
-        updateDraft { it.copy(arInput = arInput, referenceInput = "", depthEnabled = depthEnabled) }
+        updateDraft {
+            it.copy(arInput = arInput, referenceInput = "", depthEnabled = depthEnabled, session = session)
+        }
     }
 
     fun onArChanged(value: String) = updateDraft { it.copy(arInput = value) }
@@ -84,10 +90,11 @@ class FieldTrialsViewModel(
             is TrialDraft.Result.Valid -> viewModelScope.launch {
                 runCatching { repository.add(result.trial) }
                     .onSuccess {
-                        // Kind, Depth and conditions usually repeat across consecutive trials.
+                        // Kind, Depth and conditions usually repeat across consecutive trials; the
+                        // session belongs to the saved measurement only.
                         _uiState.update {
                             it.copy(
-                                draft = it.draft.copy(arInput = "", referenceInput = ""),
+                                draft = it.draft.copy(arInput = "", referenceInput = "", session = null),
                                 justSaved = true,
                             )
                         }

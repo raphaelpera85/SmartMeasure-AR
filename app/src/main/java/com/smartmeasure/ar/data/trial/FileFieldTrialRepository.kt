@@ -24,6 +24,9 @@ class FileFieldTrialRepository(
     private val mutex = Mutex()
     private val trials = MutableStateFlow<List<FieldTrial>?>(null)
 
+    /** Set on load when the existing file has a header this version cannot read. Guarded by [mutex]. */
+    private var unsupportedFile = false
+
     override fun observeTrials(): Flow<List<FieldTrial>> =
         trials
             .onStart { mutex.withLock { loadLocked() } }
@@ -40,7 +43,11 @@ class FileFieldTrialRepository(
 
     private suspend fun mutate(transform: (List<FieldTrial>) -> List<FieldTrial>) {
         mutex.withLock {
-            val updated = transform(loadLocked())
+            val current = loadLocked()
+            check(!unsupportedFile) {
+                "Field trial file has an unsupported format version; refusing to overwrite it."
+            }
+            val updated = transform(current)
             withContext(ioDispatcher) { write(updated) }
             trials.value = updated
         }
@@ -51,8 +58,17 @@ class FileFieldTrialRepository(
             .sortedByDescending { it.recordedAtEpochMillis }
             .also { trials.value = it }
 
-    private fun read(): List<FieldTrial> =
-        if (file.exists()) FieldTrialCodec.decode(file.readText()) else emptyList()
+    /**
+     * v1 and v2 files are read (v1 is rewritten as v2 on the next write). A file with any other
+     * header — typically written by a newer app version — shows no trials and is never
+     * overwritten: writes fail with [IllegalStateException], which the caller reports.
+     */
+    private fun read(): List<FieldTrial> {
+        if (!file.exists()) return emptyList()
+        val text = file.readText()
+        unsupportedFile = !FieldTrialCodec.canOverwrite(text)
+        return FieldTrialCodec.decode(text)
+    }
 
     private fun write(items: List<FieldTrial>) {
         file.parentFile?.mkdirs()

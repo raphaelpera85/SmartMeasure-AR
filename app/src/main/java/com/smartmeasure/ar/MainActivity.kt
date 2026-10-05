@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                                 fieldTrialsViewModel.startDraft(
                                     arMeters = null,
                                     depthEnabled = uiState.depthSupport == DepthSupport.SUPPORTED,
+                                    session = null, // not started from AR: no session to record
                                 )
                                 openFieldTrials(from = Destination.DIAGNOSTICS)
                             },
@@ -140,6 +141,8 @@ class MainActivity : ComponentActivity() {
                                 fieldTrialsViewModel.startDraft(
                                     arMeters = uiState.distanceMeters,
                                     depthEnabled = uiState.depthEnabled,
+                                    // Summary of the session as it stood when the trial was started.
+                                    session = uiState.sessionSummary,
                                 )
                                 // Leaving disposes the AR view and its anchors; the value now lives in the draft.
                                 arMeasurementViewModel.onReset()

@@ -1,5 +1,6 @@
 package com.smartmeasure.ar.presentation.trials
 
+import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
 import com.smartmeasure.ar.domain.model.MeasurementKind
@@ -9,13 +10,20 @@ enum class TrialInputError {
     INVALID_REFERENCE,
 }
 
-/** Editable form values for a new trial. Text inputs accept either ',' or '.' as decimal mark. */
+/**
+ * Editable form values for a new trial. Text inputs accept either ',' or '.' as decimal mark.
+ *
+ * [session] is the AR session summary captured with the measurement that prefilled [arInput]; it
+ * is kept if the user edits [arInput] by hand (rounding or correcting a reading does not change the
+ * session it was taken in) and is null for drafts not started from the AR screen.
+ */
 data class TrialDraft(
     val arInput: String = "",
     val referenceInput: String = "",
     val kind: MeasurementKind = MeasurementKind.WALL,
     val depthEnabled: Boolean = false,
     val conditions: Set<CaptureCondition> = emptySet(),
+    val session: ArSessionSummary? = null,
 ) {
     sealed interface Result {
         data class Valid(val trial: FieldTrial) : Result
@@ -37,6 +45,7 @@ data class TrialDraft(
                 arMeters = ar,
                 referenceMeters = reference,
                 conditions = conditions,
+                session = session,
             ),
         )
     }
