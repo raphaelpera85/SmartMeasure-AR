@@ -52,7 +52,7 @@ Permitir que uma pessoa faça levantamento guiado de cômodos com Android, revis
 | Rodada real de ensaios: matriz de aparelhos, cômodos claros/escuros/lisos/reflexivos/pequenos | Pendente; depende de aparelhos físicos e trena laser | Exportar o CSV de cada aparelho |
 | Tabela de decisão (requisitos mínimos/fallback) | Pendente; depende da rodada real | — |
 
-**Gate atual:** 61 testes unitários passando, `assembleDebug` e `lintDebug` sem erros.
+**Gate atual:** 75 testes unitários passando, `assembleDebug` e `lintDebug` sem erros.
 
 ## Fases sugeridas
 

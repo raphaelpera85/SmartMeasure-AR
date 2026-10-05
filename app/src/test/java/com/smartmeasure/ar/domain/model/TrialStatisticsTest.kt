@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe
+import java.util.Locale
 
 private fun trial(
     ar: Double,
@@ -39,6 +40,15 @@ class FieldTrialTest : StringSpec({
         shouldThrow<IllegalArgumentException> { trial(ar = 1.0, reference = -1.0) }
         shouldThrow<IllegalArgumentException> { trial(ar = Double.NaN, reference = 1.0) }
         shouldThrow<IllegalArgumentException> { trial(ar = 1.0, reference = Double.POSITIVE_INFINITY) }
+    }
+
+    "a trial has no AR session summary by default (manual entry, older data)" {
+        trial(ar = 1.0, reference = 1.0).session shouldBe null
+    }
+
+    "a trial keeps the AR session summary it was captured with" {
+        val session = ArSessionSummary(3.5, 1, 20.0, 18.0, 1, 2)
+        trial(ar = 1.0, reference = 1.0).copy(session = session).session shouldBe session
     }
 })
 
@@ -133,8 +143,73 @@ class FieldTrialCsvTest : StringSpec({
         )
 
         csv.lines()[0] shouldBe "id,recorded_at_utc,device_model,depth_enabled,kind,ar_m,reference_m," +
-            "signed_error_m,absolute_error_m,relative_error_pct,conditions"
+            "signed_error_m,absolute_error_m,relative_error_pct,conditions," +
+            "session_path_m,session_tracking_losses,session_duration_s,session_tracking_ratio," +
+            "session_horizontal_planes,session_vertical_planes"
         csv.lines()[1] shouldBe "a,1970-01-01T00:00:00Z,\"Acme \"\"X\"\", Pro\",true,OPENING,0.8123,0.8000," +
-            "0.0123,0.0123,1.54,LOW_LIGHT;REFLECTIVE_SURFACE"
+            "0.0123,0.0123,1.54,LOW_LIGHT;REFLECTIVE_SURFACE,,,,,,"
+    }
+
+    "session columns are appended after the original eleven columns" {
+        val header = FieldTrialCsv.encode(emptyList()).lines()[0].split(",")
+        header.size shouldBe 17
+        header[10] shouldBe "conditions"
+        header.drop(11) shouldBe listOf(
+            "session_path_m",
+            "session_tracking_losses",
+            "session_duration_s",
+            "session_tracking_ratio",
+            "session_horizontal_planes",
+            "session_vertical_planes",
+        )
+    }
+
+    "session summary fills the session columns with dot decimals in any locale" {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.GERMANY)
+        try {
+            val csv = FieldTrialCsv.encode(
+                listOf(
+                    trial(ar = 3.02, reference = 3.0, id = "s").copy(
+                        session = ArSessionSummary(
+                            distanceMeters = 12.3456,
+                            trackingLosses = 2,
+                            durationSeconds = 3.0,
+                            trackingSeconds = 2.0,
+                            horizontalPlanes = 1,
+                            verticalPlanes = 3,
+                        ),
+                    ),
+                ),
+            )
+            val fields = csv.lines()[1].split(",")
+            fields.size shouldBe 17
+            fields.drop(11) shouldBe listOf("12.346", "2", "3.00", "0.667", "1", "3")
+            fields[5] shouldBe "3.0200"
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    "tracking ratio is empty when the session has no duration" {
+        val csv = FieldTrialCsv.encode(
+            listOf(
+                trial(ar = 1.0, reference = 1.0, id = "z").copy(
+                    session = ArSessionSummary(0.0, 0, 0.0, 0.0, 0, 0),
+                ),
+            ),
+        )
+        csv.lines()[1].split(",").drop(11) shouldBe listOf("0.000", "0", "0.00", "", "0", "0")
+    }
+
+    "full tracking exports a ratio of exactly one" {
+        val csv = FieldTrialCsv.encode(
+            listOf(
+                trial(ar = 1.0, reference = 1.0, id = "f").copy(
+                    session = ArSessionSummary(1.0, 0, 10.0, 10.0, 0, 1),
+                ),
+            ),
+        )
+        csv.lines()[1].split(",")[14] shouldBe "1.000"
     }
 })

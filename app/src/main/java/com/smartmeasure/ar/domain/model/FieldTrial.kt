@@ -23,6 +23,10 @@ enum class CaptureCondition {
  * One Phase 0 accuracy trial: an AR measurement compared with the same dimension taken by a
  * reference instrument (laser or tape). Values are kept in meters; the reference is treated as
  * ground truth only for this comparison, not as a certified value.
+ *
+ * [session] is the summary of the AR session the measurement came from (path, tracking losses,
+ * tracked time, planes), so error can be compared with capture conditions per device. It is null
+ * for trials typed in manually and for trials stored before the field existed.
  */
 data class FieldTrial(
     val id: String,
@@ -33,6 +37,7 @@ data class FieldTrial(
     val arMeters: Double,
     val referenceMeters: Double,
     val conditions: Set<CaptureCondition> = emptySet(),
+    val session: ArSessionSummary? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Trial id must not be blank." }

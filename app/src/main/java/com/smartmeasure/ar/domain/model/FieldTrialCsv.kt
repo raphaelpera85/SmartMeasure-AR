@@ -19,6 +19,13 @@ object FieldTrialCsv {
         "absolute_error_m",
         "relative_error_pct",
         "conditions",
+        // Session columns are appended at the end so sheets that read by position keep working.
+        "session_path_m",
+        "session_tracking_losses",
+        "session_duration_s",
+        "session_tracking_ratio",
+        "session_horizontal_planes",
+        "session_vertical_planes",
     )
 
     fun encode(trials: List<FieldTrial>): String = buildString {
@@ -40,10 +47,27 @@ object FieldTrialCsv {
                     trial.absoluteErrorMeters.format(4),
                     (trial.relativeError * 100).format(2),
                     trial.conditions.sortedBy { it.ordinal }.joinToString(";") { it.name },
-                ).joinToString(",") { it.csvEscaped() },
+                ).plus(sessionFields(trial.session)).joinToString(",") { it.csvEscaped() },
             )
         }
     }
+
+    /** Empty cells when the trial has no AR session (manual entry or older data). */
+    private fun sessionFields(session: ArSessionSummary?): List<String> =
+        if (session == null) {
+            List(SESSION_COLUMNS) { "" }
+        } else {
+            listOf(
+                session.distanceMeters.format(3),
+                session.trackingLosses.toString(),
+                session.durationSeconds.format(2),
+                session.trackingRatio?.format(3).orEmpty(),
+                session.horizontalPlanes.toString(),
+                session.verticalPlanes.toString(),
+            )
+        }
+
+    private const val SESSION_COLUMNS = 6
 
     private fun Double.format(decimals: Int): String =
         String.format(Locale.US, "%.${decimals}f", this)

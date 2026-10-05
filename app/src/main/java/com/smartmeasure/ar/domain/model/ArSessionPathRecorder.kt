@@ -12,6 +12,10 @@ import kotlin.math.sqrt
  * @property trackingSeconds part of [durationSeconds] spent tracking.
  * @property horizontalPlanes tracked horizontal planes (floor, tables, ceiling).
  * @property verticalPlanes tracked vertical planes (walls).
+ *
+ * Invariants (checked in init, so any producer — recorder, storage, manual entry — gets them):
+ * every value is finite and non-negative, and [trackingSeconds] does not exceed
+ * [durationSeconds] by more than [TIME_TOLERANCE_SECONDS].
  */
 data class ArSessionSummary(
     val distanceMeters: Double,
@@ -20,7 +24,36 @@ data class ArSessionSummary(
     val trackingSeconds: Double,
     val horizontalPlanes: Int,
     val verticalPlanes: Int,
-)
+) {
+    init {
+        require(distanceMeters.isFinite() && distanceMeters >= 0) { "Distance must be finite and >= 0." }
+        require(trackingLosses >= 0) { "Tracking losses must be >= 0." }
+        require(durationSeconds.isFinite() && durationSeconds >= 0) { "Duration must be finite and >= 0." }
+        require(trackingSeconds.isFinite() && trackingSeconds >= 0) {
+            "Tracking time must be finite and >= 0."
+        }
+        require(trackingSeconds <= durationSeconds + TIME_TOLERANCE_SECONDS) {
+            "Tracking time must not exceed the session duration."
+        }
+        require(horizontalPlanes >= 0 && verticalPlanes >= 0) { "Plane counts must be >= 0." }
+    }
+
+    /**
+     * Share of [durationSeconds] spent tracking, in 0..1 (capped at 1 when rounding puts tracking
+     * time within [TIME_TOLERANCE_SECONDS] above the duration); null when the session has no
+     * duration, since the share is undefined.
+     */
+    val trackingRatio: Double?
+        get() = if (durationSeconds > 0) (trackingSeconds / durationSeconds).coerceAtMost(1.0) else null
+
+    companion object {
+        /**
+         * Allowance (1 µs) for tracking time above duration caused by rounding when the summary is
+         * rebuilt from stored or exported values. The recorder itself never exceeds the duration.
+         */
+        const val TIME_TOLERANCE_SECONDS = 1e-6
+    }
+}
 
 /**
  * Records the camera path of one AR session from per-frame samples.
