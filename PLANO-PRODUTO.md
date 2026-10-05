@@ -51,6 +51,8 @@ Permitir que uma pessoa faça levantamento guiado de cômodos com Android, revis
 | Revisão de UX/acessibilidade da tela de ensaios (especialista de UI; verificada pela Qualidade, com ressalvas menores) | Feito; não verificada visualmente em aparelho | `presentation/trials/FieldTrialsScreen.kt` |
 | Correção de crash em Android 7–10 (`Activity#getDisplay`, API 30) | Feito; confirmado pelo lint `NewApi` | `ArMeasureView.kt` |
 | Registro de percurso e qualidade de rastreamento (distância percorrida com filtro de jitter de 2 cm, perdas de rastreamento, tempo rastreando, planos horizontais e verticais), exibido na tela AR | Feito (especialista de ARCore; verificado pela Qualidade, com ressalvas menores); não validado em aparelho | `domain/model/ArSessionPathRecorder.kt`, `presentation/ar/*` |
+| Emuladores e roteiros de uso (`tools/emulator/`, R1–R6) nos AVDs `SmartMeasureApi24` e `SmartMeasureApi35Play` (API 37 instável nesta máquina) | Feito; a primeira rodada achou defeitos (abaixo) | `tools/emulator/README.md` |
+| Defeitos de uso no emulador: voltar do sistema na tela manual fecha o app (R2.11); girar a tela volta ao diagnóstico e perde o rascunho (R6.1/6.2); morte de processo perde a tela (R6.3); erro do modo manual fixo em inglês (R5.3); "Preparar AR" falha no emulador com erro genérico, sem causa registrada (R4.2) | Em correção pelos especialistas | evidências na pasta scratch `smartmeasure-usage/2026-10-05` |
 | Rodada real de ensaios: matriz de aparelhos, cômodos claros/escuros/lisos/reflexivos/pequenos | Pendente; depende de aparelhos físicos e trena laser | Exportar o CSV de cada aparelho |
 | Tabela de decisão (requisitos mínimos/fallback) | Pendente; depende da rodada real | — |
 

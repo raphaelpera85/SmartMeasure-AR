@@ -12,6 +12,7 @@ Toda tarefa de desenvolvimento é despachada ao especialista da área. O agente 
 | Telas Compose, Material 3, UX, acessibilidade, textos e traduções | UI Compose e UX | `ui-compose.md` |
 | Conferir trabalho "pronto", revisar diff, testes enfraquecidos, regressões | Qualidade e Verificação | `qualidade-verificacao.md` |
 | Fontes, aparelhos compatíveis, protocolos de ensaio, criar ou atualizar skills | Pesquisa de Domínio e Skills | `pesquisa-dominio.md` |
+| Emuladores, testes de uso em emulador/aparelho, testes instrumentados (`androidTest`) | Testes em Dispositivo | `testes-dispositivo.md` |
 
 Tarefas que cruzam áreas são divididas em subtarefas por especialista, em ordem de dependência. Exemplo: Geometria define o modelo, Arquitetura persiste, UI exibe e Qualidade verifica.
 

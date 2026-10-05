@@ -31,6 +31,7 @@ O desenvolvimento é dividido entre os especialistas definidos em `.agents/espec
 | Validar trabalho concluído | `fable-judge` (verificação adversarial), `verify-and-stop` | `requesting-code-review` |
 | Pesquisa de domínio ou nova skill de domínio | `fable-domain`, `grounded-citations` | `hermes-agent-skill-authoring` |
 | Economia de contexto e delegação | `caveman`, `cavecrew` | — |
+| Emuladores, testes instrumentados e testes de uso | `android-emulator-testing` | `mobile-android-design` |
 | Exportações futuras (PDF/planilha) | `pdf`, `xlsx` | — |
 
 Não se aplica: `kotlin-springboot`, porque o projeto não tem backend Spring.
@@ -42,12 +43,12 @@ Não se aplica: `kotlin-springboot`, porque o projeto não tem backend Spring.
 | `smartmeasure-ar-dev` | Comandos de build, teste e lint; ciclo TDD com stubs `TODO()`; regras de arquitetura; armadilhas do ambiente Windows/git-bash. |
 | `arcore-android` | Não havia skill de ARCore. Registra ciclo de vida da sessão, Depth opcional, hit tests e a armadilha `getDisplay` (API 30) com `minSdk` 24. |
 | `kotlin-coroutines-flows` | Já era citada por `android-clean-architecture`, mas não existia. Cobre StateFlow, repositório com `Mutex` e testes com `Dispatchers.setMain`. |
+| `android-emulator-testing` | AVDs do projeto (API 24 e API 35 com Play/ARCore; API 37 instável nesta máquina), boot sem janela, instalação, captura de tela e `connectedDebugAndroidTest`. |
 | `smartmeasure-especialistas` | Roteia toda tarefa ao especialista da área; inclui um modelo de contexto para `delegate_task`. |
 
 ## Lacunas conhecidas (criar quando a tarefa surgir)
 
 - **Room/migrações**: quando o projeto/planta persistente substituir o arquivo de ensaios (Fase 1). Use também `migration`.
-- **Testes de UI Compose / instrumentados**: ainda não há `androidTest`. Crie a skill na primeira vez que forem configurados.
 - **Exportação de planta (PDF/imagem cotada)**: Fase 1.
 - **Protocolo de ensaio em campo**: a matriz de aparelhos e o roteiro de medição com trena laser podem virar skill de domínio em `.agents/skills/` depois da primeira rodada real.
 
@@ -67,3 +68,4 @@ Não se aplica: `kotlin-springboot`, porque o projeto não tem backend Spring.
 - Arquitetura Android criou o formato v2 dos ensaios, com migração da v1, a regra de manter o ensaio quando só a sessão é inválida e a proteção contra sobrescrever arquivo de versão futura (`migration`, TDD com 12 testes). Qualidade: VERIFICADO COM RESSALVAS, com 87 testes; 7 de 8 mutações detectadas.
 - Arquitetura Android implementou a recuperação de arquivo de ensaios ilegível: estado `UNREADABLE` exposto e backup que nunca apaga nem sobrescreve; também cobriu as lacunas de arquivo vazio e de falha ao excluir, com prova por mutação. O orquestrador verificou pelo diff e pelo gate: 102 testes.
 - UI Compose e UX criou o aviso e o diálogo de recuperação do arquivo de ensaios e passou a mostrar o resumo da sessão em cada ensaio; os formatadores `pathMeters` e `wholePercent` foram feitos por TDD. Qualidade: VERIFICADO COM RESSALVAS, com 105 testes; a mutação de arredondamento comum no lugar do arredondamento para baixo foi detectada.
+- O orquestrador criou o AVD `SmartMeasureApi24` e validou os AVDs: o app abre na API 24 e na API 35 (Play, ARCore instalado); a API 37 está instável nesta máquina (loop de crash do surfaceflinger). Foram criados a skill `android-emulator-testing` ; o especialista Testes em Dispositivo e os roteiros `tools/emulator/` (de uma sessão anterior) foram mantidos.
