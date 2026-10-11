@@ -1,5 +1,6 @@
 package com.smartmeasure.ar.presentation.trials
 
+import androidx.lifecycle.SavedStateHandle
 import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
@@ -67,12 +68,37 @@ class FieldTrialsViewModelTest : StringSpec({
         Locale.setDefault(defaultLocale)
     }
 
-    fun viewModel(repository: FieldTrialRepository) = FieldTrialsViewModel(
+    fun viewModel(
+        repository: FieldTrialRepository,
+        savedState: SavedStateHandle = SavedStateHandle(),
+    ) = FieldTrialsViewModel(
         repository = repository,
         deviceModel = "Acme One",
         clock = { 42L },
         idFactory = { "trial-1" },
+        savedState = savedState,
     )
+
+    "a process-death recreation restores the complete trial draft" {
+        val savedState = SavedStateHandle()
+        val first = viewModel(FakeFieldTrialRepository(), savedState)
+        first.onArChanged("2,61")
+        first.onReferenceChanged("2.60")
+        first.onKindSelected(MeasurementKind.HEIGHT)
+        first.onDepthChanged(true)
+        first.onConditionToggled(CaptureCondition.LOW_LIGHT)
+        first.onConditionToggled(CaptureCondition.REFLECTIVE_SURFACE)
+
+        val recreated = viewModel(FakeFieldTrialRepository(), savedState)
+
+        recreated.uiState.value.draft shouldBe TrialDraft(
+            arInput = "2,61",
+            referenceInput = "2.60",
+            kind = MeasurementKind.HEIGHT,
+            depthEnabled = true,
+            conditions = setOf(CaptureCondition.LOW_LIGHT, CaptureCondition.REFLECTIVE_SURFACE),
+        )
+    }
 
     "stored trials and their summaries reach the ui state" {
         val stored = FieldTrial("a", 1L, "Acme One", false, MeasurementKind.WALL, 3.02, 3.0)

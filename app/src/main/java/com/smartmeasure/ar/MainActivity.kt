@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
     private val arMeasurementViewModel: ArMeasurementViewModel by viewModels()
     private val fieldTrialsViewModel: FieldTrialsViewModel by viewModels {
         FieldTrialsViewModel.Factory(
+            owner = this,
             repository = FileFieldTrialRepository(File(filesDir, FIELD_TRIALS_FILE)),
             deviceModel = Build.MANUFACTURER + " " + Build.MODEL,
         )

@@ -1,8 +1,10 @@
 package com.smartmeasure.ar.presentation.trials
 
+import androidx.lifecycle.AbstractSavedStateViewModelFactory
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.savedstate.SavedStateRegistryOwner
 import com.smartmeasure.ar.domain.model.ArSessionSummary
 import com.smartmeasure.ar.domain.model.CaptureCondition
 import com.smartmeasure.ar.domain.model.FieldTrial
@@ -39,8 +41,11 @@ class FieldTrialsViewModel(
     private val deviceModel: String,
     private val clock: () -> Long = System::currentTimeMillis,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
+    private val savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(FieldTrialsUiState())
+    private val _uiState = MutableStateFlow(
+        FieldTrialsUiState(draft = restoreDraft()),
+    )
     val uiState: StateFlow<FieldTrialsUiState> = _uiState.asStateFlow()
 
     init {
@@ -100,11 +105,17 @@ class FieldTrialsViewModel(
             is TrialDraft.Result.Valid -> viewModelScope.launch {
                 runCatching { repository.add(result.trial) }
                     .onSuccess {
-                        // Kind, Depth and conditions usually repeat across consecutive trials; the
-                        // session belongs to the saved measurement only.
                         _uiState.update {
+                            // Kind, Depth and conditions usually repeat across consecutive trials; the
+                            // session belongs to the saved measurement only.
+                            val clearedDraft = it.draft.copy(
+                                arInput = "",
+                                referenceInput = "",
+                                session = null,
+                            )
+                            persistDraft(clearedDraft)
                             it.copy(
-                                draft = it.draft.copy(arInput = "", referenceInput = "", session = null),
+                                draft = clearedDraft,
                                 justSaved = true,
                             )
                         }
@@ -133,8 +144,10 @@ class FieldTrialsViewModel(
 
     private fun updateDraft(transform: (TrialDraft) -> TrialDraft) {
         _uiState.update {
+            val draft = transform(it.draft)
+            persistDraft(draft)
             it.copy(
-                draft = transform(it.draft),
+                draft = draft,
                 inputError = null,
                 saveFailed = false,
                 justSaved = false,
@@ -142,14 +155,56 @@ class FieldTrialsViewModel(
         }
     }
 
+    private fun restoreDraft(): TrialDraft {
+        val kind = savedState.get<String>(KEY_KIND)
+            ?.let { saved -> MeasurementKind.entries.firstOrNull { it.name == saved } }
+            ?: MeasurementKind.WALL
+        val conditions = savedState.get<List<String>>(KEY_CONDITIONS)
+            .orEmpty()
+            .mapNotNull { saved -> CaptureCondition.entries.firstOrNull { it.name == saved } }
+            .toSet()
+        return TrialDraft(
+            arInput = savedState[KEY_AR_INPUT] ?: "",
+            referenceInput = savedState[KEY_REFERENCE_INPUT] ?: "",
+            kind = kind,
+            depthEnabled = savedState[KEY_DEPTH_ENABLED] ?: false,
+            conditions = conditions,
+        )
+    }
+
+    private fun persistDraft(draft: TrialDraft) {
+        savedState[KEY_AR_INPUT] = draft.arInput
+        savedState[KEY_REFERENCE_INPUT] = draft.referenceInput
+        savedState[KEY_KIND] = draft.kind.name
+        savedState[KEY_DEPTH_ENABLED] = draft.depthEnabled
+        savedState[KEY_CONDITIONS] = draft.conditions.map { it.name }
+    }
+
     class Factory(
+        owner: SavedStateRegistryOwner,
         private val repository: FieldTrialRepository,
         private val deviceModel: String,
-    ) : ViewModelProvider.Factory {
+    ) : AbstractSavedStateViewModelFactory(owner, null) {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        override fun <T : ViewModel> create(
+            key: String,
+            modelClass: Class<T>,
+            handle: SavedStateHandle,
+        ): T {
             require(modelClass.isAssignableFrom(FieldTrialsViewModel::class.java))
-            return FieldTrialsViewModel(repository, deviceModel) as T
+            return FieldTrialsViewModel(
+                repository = repository,
+                deviceModel = deviceModel,
+                savedState = handle,
+            ) as T
         }
+    }
+
+    private companion object {
+        const val KEY_AR_INPUT = "field_trials_draft_ar_input"
+        const val KEY_REFERENCE_INPUT = "field_trials_draft_reference_input"
+        const val KEY_KIND = "field_trials_draft_kind"
+        const val KEY_DEPTH_ENABLED = "field_trials_draft_depth_enabled"
+        const val KEY_CONDITIONS = "field_trials_draft_conditions"
     }
 }
