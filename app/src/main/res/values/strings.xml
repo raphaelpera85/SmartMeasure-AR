@@ -43,13 +43,13 @@
     <string name="back">Back</string>
     <string name="manual_error_invalid_dimensions">Enter a width and a length greater than zero, in meters (e.g. 3.5).</string>
     <string name="manual_result_title">Room estimate</string>
-    <string name="area_result">Area: %1$s m²</string>
-    <string name="perimeter_result">Perimeter: %1$s m</string>
+    <string name="area_result">Area: %1$s\u00A0m²</string>
+    <string name="perimeter_result">Perimeter: %1$s\u00A0m</string>
     <string name="manual_measurement_note">This first fallback handles rectangular rooms. Free-form walls, openings and confidence tracking will build on the same geometry domain.</string>
     <string name="ar_measurement_title">AR measurement</string>
     <string name="ar_depth_active">Depth assistance: active</string>
     <string name="ar_depth_inactive">Depth assistance: unavailable; plane/feature hits are used</string>
-    <string name="ar_distance_result">Distance: %1$s m</string>
+    <string name="ar_distance_result">Distance: %1$s\u00A0m</string>
     <string name="capture_first_point">Capture first point</string>
     <string name="capture_second_point">Capture second point</string>
     <string name="reset_measurement">Reset</string>

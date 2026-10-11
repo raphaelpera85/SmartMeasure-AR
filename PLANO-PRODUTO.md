@@ -124,7 +124,8 @@ Fontes primárias e limitações estão em [.agents/skills/FONTES.md](.agents/sk
 
 ## Próxima etapa
 
+Todo o trabalho de software que não depende de aparelho físico está concluído (ver "Progresso da Fase 0"). Restam apenas itens que exigem hardware real:
+
 1. Instalar o APK de debug em aparelhos reais e fazer a primeira rodada de ensaios: paredes, vãos e alturas, com e sem Depth, nas condições listadas. Exportar o CSV de cada aparelho.
 2. Validar em aparelho: leitura pelo TalkBack (tela de ensaios, chips, resumo da sessão), duplo toque na recuperação, registro de percurso após pausa curta.
-3. Usar espaço não separável também nos resultados da medição manual e da tela AR (`area_result`, `perimeter_result`, `ar_distance_result`).
-4. Com os dados reais, definir requisitos mínimos de aparelho, política de fallback e limites de aceitação.
+3. Com os dados reais, definir requisitos mínimos de aparelho, política de fallback e limites de aceitação (depende dos itens 1 e 2).

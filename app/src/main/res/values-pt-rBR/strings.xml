@@ -43,13 +43,13 @@
     <string name="back">Voltar</string>
     <string name="manual_error_invalid_dimensions">Informe largura e comprimento maiores que zero, em metros (ex.: 3,5).</string>
     <string name="manual_result_title">Estimativa do cômodo</string>
-    <string name="area_result">Área: %1$s m²</string>
-    <string name="perimeter_result">Perímetro: %1$s m</string>
+    <string name="area_result">Área: %1$s\u00A0m²</string>
+    <string name="perimeter_result">Perímetro: %1$s\u00A0m</string>
     <string name="manual_measurement_note">Este primeiro fallback cobre cômodos retangulares. Paredes livres, vãos e controle de confiança usarão o mesmo domínio geométrico.</string>
     <string name="ar_measurement_title">Medição em AR</string>
     <string name="ar_depth_active">Assistência de profundidade: ativa</string>
     <string name="ar_depth_inactive">Assistência de profundidade: indisponível; serão usados planos e pontos visuais</string>
-    <string name="ar_distance_result">Distância: %1$s m</string>
+    <string name="ar_distance_result">Distância: %1$s\u00A0m</string>
     <string name="capture_first_point">Capturar primeiro ponto</string>
     <string name="capture_second_point">Capturar segundo ponto</string>
     <string name="reset_measurement">Reiniciar</string>
